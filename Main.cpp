@@ -31,6 +31,7 @@
 
 #include "Argument.h"
 #include "IO.h"
+#include "StringUtil.h"
 
 #include "Chromosome.h"
 
@@ -71,16 +72,40 @@ char AnnotationString[][32]= {
 struct Range{
     int start;
     int end;
+    Range(int s, int e): start(s), end(e) {};
+    Range(): start(-1), end(-1) {};
 };
 class Gene{
 public:
-    void ReadLine(const char* line);
+    void readLine(const char* line) {
+        std::vector< std::string > field;
+        std::vector< std::string > exon_beg;
+        std::vector< std::string > exon_end;
+        int nf = stringTokenize(line, "\t", &field);
+        if (nf < 11) {
+            return;
+        }
+        this->name = field[0];
+        this->chr = field[2];
+        this->forwardStrand = (field[3] == "+" ? true: false);
+        this->tx.start = toInt(field[4]);
+        this->tx.end = toInt(field[5]);
+        this->cds.start = toInt(field[6]);
+        this->cds.end = toInt(field[7]);
+        unsigned int nExon = toInt(field[8]);
+        stringTokenize(field[9], ',', &exon_beg);
+        stringTokenize(field[10], ',', &exon_end);
+        for (unsigned int i = 0; i < nExon; i++ ){
+            this->exon.push_back(Range(toInt(exon_beg[i]), toInt(exon_end[i])));
+        }
+    };
 public:
+    std::string name;
     std::string chr;
+    bool forwardStrand;
     Range tx;
     Range cds;
     std::vector<Range> exon;
-    bool forwardStrand;
 };
 struct GeneAnnotationParam{
     GeneAnnotationParam():
@@ -97,12 +122,23 @@ struct GeneAnnotationParam{
 class GeneAnnotation{
 public:
     void readGeneFile(const char* geneFileName){
+        std::string line;
+        std::vector<std::string> fields;
+        LineReader lr(geneFileName);
+        while (lr.readLine(&line) > 0) {
+            stringStrip(&line);
+            if (line.size()>0 and line[0] == '#' || line.size() == 0) continue; // skip headers and empty lines
+            Gene g;
+            g.readLine(line.c_str());
+            this->geneList[g.chr].push_back(g);
+        }
         return;
     }; 
     void openReferenceGenome(const char* referenceGenomeFileName) {
-        this->gs.setReferenceName(referenceGenomeFileName);
+
         // check if -bs.umfa file exists
         std::string umfaFileName = referenceGenomeFileName;
+        stringSlice(&umfaFileName, 0, -3);
         umfaFileName += "-bs.umfa";
         FILE* fp = fopen(umfaFileName.c_str(), "r");
         if (fp == NULL) { // does not exist binary format, so try to create one
@@ -111,7 +147,8 @@ public:
         } else{
             fclose(fp);
         }
-        if (!this->gs.open()) {
+        this->gs.setReferenceName(referenceGenomeFileName);
+        if (this->gs.open()) {
             fprintf(stderr, "Cannot open reference genome file %s\n", referenceGenomeFileName);
             exit(1);
         }
@@ -128,6 +165,9 @@ public:
             if (field.size() < 4) continue; 
         }
         return;
+    };
+    void setAnnotationParameter(GeneAnnotationParam& param) {
+        this->param = param;
     };
 private:
     // store results in start and end, index are 0-based, inclusive
@@ -156,6 +196,14 @@ private:
      *          2: insertion
      */
     int getMutationType(const char* ref, const char* alt) {
+        unsigned int refLen = strlen(ref);
+        unsigned int altLen = strlen(alt);
+        if (refLen == altLen) 
+            return 0;
+        else if (refLen > altLen) 
+            return 1;
+        else if (refLen < altLen)
+            return 2;
         return -1;
     };
     GeneAnnotationParam param;
@@ -176,9 +224,9 @@ int main(int argc, char *argv[])
     pl.Status();
     
     GeneAnnotation ga;
-    ga.readGeneFile("a");
-    ga.openReferenceGenome("b");
-    ga.annotate("input", "output");
+    ga.readGeneFile("test_gene.txt");
+    ga.openReferenceGenome("test.fa");
+    ga.annotate("test.vcf", "test.output.vcf");
 
     return 0;
 }
