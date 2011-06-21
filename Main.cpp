@@ -49,7 +49,8 @@ typedef enum AnnotationType{
     START_GAIN,
     START_LOSE,
     NORMAL_SPLICE_SITE,
-    ESSENTIAL_SPLICE_SITE
+    ESSENTIAL_SPLICE_SITE,
+    INTROGENIC
 } AnnotationType;
 
 char AnnotationString[][32]= {
@@ -66,7 +67,8 @@ char AnnotationString[][32]= {
     "Start_Gain",
     "Start_Lose",
     "Normal_Splice_Site",
-    "Essential_Splice_Site"
+    "Essential_Splice_Site",
+    "Introgenic"
 };
 // all are 1-based index, inclusive on boundaries.
 struct Range{
@@ -74,6 +76,7 @@ struct Range{
     int end;
     Range(int s, int e): start(s), end(e) {};
     Range(): start(-1), end(-1) {};
+    int getLength() { return (end - start); };
 };
 class Gene{
 public:
@@ -97,6 +100,52 @@ public:
         stringTokenize(field[10], ',', &exon_end);
         for (unsigned int i = 0; i < nExon; i++ ){
             this->exon.push_back(Range(toInt(exon_beg[i]), toInt(exon_end[i])));
+        }
+    };
+    /**
+     *@return true if @param pos is in upstream and return how far it is from the beginning of the gene
+     */
+    bool isUpstream(const int pos, const int upstreamRange, int* dist) {
+        if (this->forwardStrand) {
+            if (this->tx.start - upstreamRange < pos && pos < this->tx.start) {
+                *dist = this->tx.start - pos;
+                return true;
+            }
+        } else {
+            if (this->tx.end < pos && pos < this->tx.end + upstreamRange) {
+                *dist = this->tx.end - pos;
+                return true;
+            }
+        }
+        return false;
+    };
+    bool isDownstream(const int pos, const int downstreamRange, int* dist) {
+        if (this->forwardStrand) {
+            if (this->tx.end < pos && pos < this->tx.end + downstreamRange) {
+                *dist = pos - this->tx.end;
+                return true;
+            }
+        } else {
+            if (this->tx.start - downstreamRange < pos && pos < this->tx.start) {
+                *dist = this->tx.start - pos;
+                return true;
+            }
+        }
+        return false;
+    };
+    bool isExon(const int variantPos, int* exonNum, std::string* codonRef, std::string* codonAlt, AnnotationType* type){
+        return false;
+    };
+    bool isIntron(const int variantPos, int* intronNum){
+        return false;
+    };
+    bool isSpliceSite(const int variantPos, int spliceIntoExon, int spliceIntoIntron, bool* isEssentialSpliceSite){
+        return false;
+    };
+    int getTotalExonLength() {
+        int l = 0;
+        for (int i = 0; i < this->exon.size(); i++) {
+            l += this->exon[i].getLength();
         }
     };
 public:
@@ -141,13 +190,13 @@ public:
         stringSlice(&umfaFileName, 0, -3);
         umfaFileName += "-bs.umfa";
         FILE* fp = fopen(umfaFileName.c_str(), "r");
+        this->gs.setReferenceName(referenceGenomeFileName);
         if (fp == NULL) { // does not exist binary format, so try to create one
             fprintf(stdout, "Create binary reference genome file for the first run\n");
             this->gs.create();
         } else{
             fclose(fp);
         }
-        this->gs.setReferenceName(referenceGenomeFileName);
         if (this->gs.open()) {
             fprintf(stderr, "Cannot open reference genome file %s\n", referenceGenomeFileName);
             exit(1);
@@ -159,10 +208,27 @@ public:
     };
     // we take a VCF input file for now
     void annotate(const char* inputFileName, const char* outputFileName){
+        std::string annotationString;
         LineReader lr(inputFileName);
         std::vector<std::string> field;
         while (lr.readLineBySep(&field, "\t") > 0) {
-            if (field.size() < 4) continue; 
+            if (field.size() < 4) continue;
+            std::string chr = field[0];
+            int pos = toInt(field[1]);
+            std::string ref = field[3];
+            std::string alt = field[4];
+            int geneBegin;
+            int geneEnd;
+            this->findInRangeGene(&geneBegin, &geneEnd, field[0], &pos);
+            if (geneEnd < 0) continue;
+            annotationString.clear();
+            for (unsigned int i = geneBegin; i <= geneEnd; i++) {
+                this->annotateByGene(i, chr, pos, ref, alt, &annotationString);
+                printf("%s %d ref=%s alt=%s has annotation: %s\n",
+                       chr.c_str(), pos, 
+                       ref.c_str(), alt.c_str(),
+                       annotationString.c_str());
+            }
         }
         return;
     };
@@ -172,22 +238,60 @@ public:
 private:
     // store results in start and end, index are 0-based, inclusive
     // find gene whose range plus downstream/upstream overlaps chr:pos 
-    void findInRangeGene(unsigned int* start, unsigned int* end, const std::string& chr, unsigned int* pos) {
+    void findInRangeGene(int* start, int* end, const std::string& chr, int* pos) {
+        *start = -1;
+        *end = -1;
+        std::vector<Gene>& g = this->geneList[chr];
+        if (g.size() == 0) {
+            return;
+        } 
+        unsigned int gLen = g.size();
+        for (unsigned int i = 0; i < gLen ; i++) {
+            if (g[i].forwardStrand) { // forward strand
+                if (g[i].tx.start - param.upstreamRange < (*pos) && (*pos) < g[i].tx.end + param.downstreamRange) {
+                    if (*start < 0) {
+                        *start = i;
+                    }
+                    *end = i;
+                }
+            } else { // reverse strand
+                if (g[i].tx.start - param.downstreamRange < *pos && *pos < g[i].tx.end + param.upstreamRange) {
+                    if (*start < 0) {
+                        *start = i;
+                    }
+                    *end = i;
+                }
+            }
+        }
+        printf("start = %d, end = %d \n", *start, *end);
         return;
     };
     
-    void annotateByGene(unsigned int geneIdx, const std::string& chr, const unsigned int& variantPos, const char* ref, const char* alt){
+    void annotateByGene(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
+                        std::string* annotationString){
         Gene& g = this->geneList[chr][geneIdx];
-        if (g.forwardStrand) {
-            if (g.tx.start - param.upstreamRange < variantPos && variantPos < g.tx.start){
-                this->annotation += AnnotationString[UPSTREAM];
-            } else if (g.tx.end < variantPos && variantPos < g.tx.end + param.downstreamRange) {
-                this->annotation += AnnotationString[DOWNSTREAM];
-            } else {
-            }
-        } else { // backward strand
-            
+        std::vector<std::string> annotation;
+        int dist;
+        int exonNum; // which exon
+        std::string codonRef;
+        std::string codonAlt;
+        AnnotationType type; // could be one of 
+                             //    SYNONYMOUS / NONSYNONYMOUS
+                             //    STOP_GAIN / STOP_LOST
+                             //    START_GAIN / START_LOST ??
+        int intronNum; // which intron
+        bool isEssentialSpliceSite;
+        if (g.isUpstream(variantPos, param.upstreamRange, &dist)) {
+            annotation.push_back(AnnotationString[DOWNSTREAM]);
+        } else if (g.isDownstream(variantPos, param.upstreamRange, &dist)) {
+            annotation.push_back(AnnotationString[DOWNSTREAM]);
+        } else if (g.isExon(variantPos, &exonNum, &codonRef, &codonAlt, &type)) {
+        } else if (g.isIntron(variantPos, &intronNum)) {
+        } else if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
+        } else {
+            annotation.push_back("Intergenic");
         }
+                            
         return;
     };
     /**@return -1: unknow type
@@ -224,7 +328,7 @@ int main(int argc, char *argv[])
     pl.Status();
     
     GeneAnnotation ga;
-    ga.readGeneFile("test_gene.txt");
+    ga.readGeneFile("test.gene.txt");
     ga.openReferenceGenome("test.fa");
     ga.annotate("test.vcf", "test.output.vcf");
 
