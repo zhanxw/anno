@@ -29,110 +29,10 @@
 #include <vector>
 #include <map>
 
-class Chromosome
-class Sequence{
-public:
-    void open(const char* fileName) {
-        
-    }
-private:
-    std::map < std::string, std::string > sequence;
-    
-};
-class FileReader{
-public:
-    FileReader(const char* fileName):
-        fp(NULL) {
-        this->open(fileName);
-    };
-    ~FileReader() {
-        if (this->fp) {
-            fclose(fp);
-        }
-    };
-    
-    // return number of characters read.
-    // when reading an empty line, will return 1, as we read '\n', however, line will be empty
-    // when reading the end, we will return 0
-    unsigned int readLine(std::string* line) {
-        if (this->isEof()) return 0;
-        assert(line);
-        line->clear();
-        char c;
-        unsigned nRead = 0;
-        while (true) {
-            c = this->getc();
-            if (c == EOF) {
-                return nRead;
-            } else if (c == '\r') {
-                // skip this
-                continue;
-            } else if (c == '\n') {
-                ++nRead;
-                return nRead;
-            } else { // normal characters
-                ++nRead;
-                line->push_back(c);
-            }
-        }   
-        assert(false); // should not reach here
-        return 0;
-    };
-    // return number of fields read.
-    // when reading an empty line, will return 1, meaning 1 field are read, although its content is empty
-    // when reading to the EOF, will 0. 
-    unsigned int readLineBySep(std::vector<std::string>* fields, const char* seq) {
-        if (this->isEof()) return 0;
-        assert(fields);
-        assert(seq);
-        fields->clear();
-        char c;
-        std::string s;
-        while (true) {
-            c = this->getc();
-            if (c == EOF) {
-                fields->push_back(s);
-                return fields->size();
-            } else if (c == '\r') {
-                // skip this
-                continue;
-            } else if (c == '\n') {
-                fields->push_back(s);
-                return fields->size();
-            } else if (strchr(seq, c) != NULL) { // separator
-                fields->push_back(s);
-                s.clear();
-            } else { // normal characters
-                s.push_back(c);
-            }
-        }   
-        assert(false); // should not reach here
-        return 0;
-    };
-    // get a char, if EOF, return EOF
-    int getc(){
-        return ::getc(this->fp);
-    }
-    // check eof 
-    bool isEof() {
-        return (feof(this->fp) != 0);
-    }
-    // open
-    FILE* open(const char* fileName) {
-        this->fp = fopen(fileName, "r");
-        if (!this->fp) {
-            fprintf(stderr, "ERROR: Cannot open %s\n", fileName);
-        }
-    }
-    // close 
-    void close() {
-        if (this->fp) {
-            fclose(fp);
-        }
-    }
-private:
-    FILE* fp;
-};
+#include "Argument.h"
+#include "IO.h"
+
+#include "Chromosome.h"
 
 typedef enum AnnotationType{
     UPSTREAM = 0,
@@ -151,9 +51,21 @@ typedef enum AnnotationType{
     ESSENTIAL_SPLICE_SITE
 } AnnotationType;
 
-char AnnotationString[][16]= {
-    "UPSTREAM", 
-    "DOWNSTREAM"
+char AnnotationString[][32]= {
+    "Upstream", 
+    "Downstream",
+    "Utr5",
+    "Utr3",
+    "Intron",
+    "Extron",
+    "Synonymous",
+    "Nonsynonymous",
+    "Stop_Gain",
+    "Stop_Lost",
+    "Start_Gain",
+    "Start_Lose",
+    "Normal_Splice_Site",
+    "Essential_Splice_Site"
 };
 // all are 1-based index, inclusive on boundaries.
 struct Range{
@@ -183,21 +95,36 @@ struct GeneAnnotationParam{
 };
 
 class GeneAnnotation{
+public:
     void readGeneFile(const char* geneFileName){
         return;
     }; 
     void openReferenceGenome(const char* referenceGenomeFileName) {
         this->gs.setReferenceName(referenceGenomeFileName);
+        // check if -bs.umfa file exists
+        std::string umfaFileName = referenceGenomeFileName;
+        umfaFileName += "-bs.umfa";
+        FILE* fp = fopen(umfaFileName.c_str(), "r");
+        if (fp == NULL) { // does not exist binary format, so try to create one
+            fprintf(stdout, "Create binary reference genome file for the first run\n");
+            this->gs.create();
+        } else{
+            fclose(fp);
+        }
         if (!this->gs.open()) {
-            fpritnf(stderr, "Cannot open reference genome file %s\n", referenceGenomeFileName);
+            fprintf(stderr, "Cannot open reference genome file %s\n", referenceGenomeFileName);
+            exit(1);
+        }
+        if (!convert2Chromosome(&this->gs, &this->reference)) {
+            fprintf(stderr, "Cannot use GenomeSequence by Chromosome.\n");
             exit(1);
         }
     };
     // we take a VCF input file for now
     void annotate(const char* inputFileName, const char* outputFileName){
-        FileReader fr(inputFileName);
+        LineReader lr(inputFileName);
         std::vector<std::string> field;
-        while (fr.readLineBySep(&field, "\t") > 0) {
+        while (lr.readLineBySep(&field, "\t") > 0) {
             if (field.size() < 4) continue; 
         }
         return;
@@ -214,7 +141,7 @@ private:
         if (g.forwardStrand) {
             if (g.tx.start - param.upstreamRange < variantPos && variantPos < g.tx.start){
                 this->annotation += AnnotationString[UPSTREAM];
-            } else if (g.tx.end < variantPos && variantPos < g.tx.end + downstreamRange) {
+            } else if (g.tx.end < variantPos && variantPos < g.tx.end + param.downstreamRange) {
                 this->annotation += AnnotationString[DOWNSTREAM];
             } else {
             }
@@ -235,27 +162,23 @@ private:
     std::map <std::string, std::vector<Gene> > geneList;
     std::string annotation;
     GenomeSequence gs;
+    std::map<std::string, Chromosome> reference;
 };
 
 int main(int argc, char *argv[])
 {
-    // FileReader fr("Makefile");
-    // // std::string line;
-    // // while (fr.readLine(&line) > 0) {
-    // //     fprintf(stdout, "%s\n", line.c_str());
-    // // }
-    // fr.close();
+    BEGIN_PARAMETER_LIST(pl)
+        ADD_STRING_PARAMETER(pl, inputFile, "-i", "Specify input VCF file")
+    END_PARAMETER_LIST(pl)
+        ;
     
-    // fr.open("Makefile");
-    // std::vector<std::string> f;
-    // while(fr.readLineBySep(&f, "\t") > 0) {
-    //     for (unsigned int  i = 0; i < f.size(); i++) {
-    //         if (i)
-    //             printf("\t");
-    //         printf("%s", f[i].c_str());
-    //     }
-    //     printf("\n");
-    // }
+    pl.Read(argc, argv);
+    pl.Status();
+    
+    GeneAnnotation ga;
+    ga.readGeneFile("a");
+    ga.openReferenceGenome("b");
+    ga.annotate("input", "output");
 
     return 0;
 }
