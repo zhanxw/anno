@@ -36,6 +36,13 @@ bool str2int(const char* input, int* output) {
     return true;
 }
 
+int toInt(const char* input) {
+    return (atoi(input));
+};
+int toInt(const std::string& input) {
+    return (atoi(input.c_str()));
+};
+
 // convert std::string to double
 // @return true if conversion succeed
 bool str2double(const char* input, double* output) {
