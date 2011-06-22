@@ -37,7 +37,8 @@ void stringStrip(std::string* input, const char* characters = " ") {
     input->assign( input->substr(beg, end-beg) );
 };
 
-// 
+//extract piece of string from @param beg(inclusive) to @param end(exclusive)
+//NOTE: beg and end can be negative meaning count from right hand side. 
 void stringSlice(std::string* input, int beg, int end) {
     assert(input);
     unsigned int len = input->size();
@@ -45,5 +46,18 @@ void stringSlice(std::string* input, int beg, int end) {
     if (end < 0) end += len;
     assert (beg >= 0 && end >= 0);
     input -> assign ( input->substr(beg, end- beg)) ;
+};
+
+std::string stringJoin(const std::vector<std::string>& input, const std::string& delim) {
+    std::string s;
+    if (input.size() == 0) {
+        return s;
+    }
+    s = input[0];
+    for (unsigned int i = 1; i < input.size(); i++) {
+        s+= delim;
+        s+= input[1];
+    }
+    return s;
 };
 #endif /* _STRINGUTIL_H_ */

@@ -21,6 +21,13 @@
  *    freq of codon change     .codon.freq
  *    freq of indel length     .indel.freq
  */
+
+/**
+ *           @
+ * 0-base: 0 1 2 3 4 5 
+ * 1-base: 1 2 3 4 5 6
+ *             ^
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -41,7 +48,7 @@ typedef enum AnnotationType{
     UTR5,
     UTR3,
     INTRON,
-    EXTRON,
+    EXON,
     SYNONYMOUS,
     NONSYNONYMOUS,
     STOP_GAIN,
@@ -59,7 +66,7 @@ char AnnotationString[][32]= {
     "Utr5",
     "Utr3",
     "Intron",
-    "Extron",
+    "Exon",
     "Synonymous",
     "Nonsynonymous",
     "Stop_Gain",
@@ -71,12 +78,14 @@ char AnnotationString[][32]= {
     "Introgenic"
 };
 // all are 1-based index, inclusive on boundaries.
+// NOTE: UCSC use 0-based start and 1-based end, this is convenient to calculate length
+//       but for complex case, this causes confusion.
 struct Range{
     int start;
     int end;
     Range(int s, int e): start(s), end(e) {};
     Range(): start(-1), end(-1) {};
-    int getLength() { return (end - start); };
+    int getLength() { return (end - start + 1); };
 };
 class Gene{
 public:
@@ -85,21 +94,27 @@ public:
         std::vector< std::string > exon_beg;
         std::vector< std::string > exon_end;
         int nf = stringTokenize(line, "\t", &field);
-        if (nf < 11) {
+        if (nf < 11) { 
+            static int nTimeError = 0;
+            fprintf(stderr, "Unable to read this gene from: %s\n", line);
+            if (nTimeError++ > 10) {
+                fprintf(stderr, "Too many errors, now quiting...\n");
+                exit(1);
+            }
             return;
         }
         this->name = field[0];
         this->chr = field[2];
         this->forwardStrand = (field[3] == "+" ? true: false);
-        this->tx.start = toInt(field[4]);
+        this->tx.start = toInt(field[4]) + 1;
         this->tx.end = toInt(field[5]);
-        this->cds.start = toInt(field[6]);
+        this->cds.start = toInt(field[6]) + 1;
         this->cds.end = toInt(field[7]);
         unsigned int nExon = toInt(field[8]);
         stringTokenize(field[9], ',', &exon_beg);
         stringTokenize(field[10], ',', &exon_end);
         for (unsigned int i = 0; i < nExon; i++ ){
-            this->exon.push_back(Range(toInt(exon_beg[i]), toInt(exon_end[i])));
+            this->exon.push_back(Range(toInt(exon_beg[i]) + 1, toInt(exon_end[i])));
         }
     };
     /**
@@ -133,10 +148,81 @@ public:
         }
         return false;
     };
-    bool isExon(const int variantPos, int* exonNum, std::string* codonRef, std::string* codonAlt, AnnotationType* type){
+    /**
+     * @return true is @param variousPos is i 5'-UTR region, 
+     * @param utrPos will store the relative position of @param variousPos to the leftmost position of 5' UTR 
+     * @param utrLen will store the length of the 5'-UTR region
+     */
+    bool is5PrimeUtr(const int variantPos, int* utrPos, int* utrLen) {
+        if (this->isNonCoding()) return false;
+        if (this->forwardStrand) {
+            if (this->exon[0].start <= variantPos && variantPos < this->cds.start) {
+                *utrPos = variantPos - this->exon[0].start;
+                *utrLen = this->cds.start - this->exon[0].start + 1;
+                return true;
+            }
+        } else {// backward strand
+            if (this->cds.end < variantPos && variantPos <= this->exon[this->exon.size() - 1].end) {
+                *utrPos = variantPos - (this->cds.end + 1); // +1: since this->cds.end is not in 5'-UTR region
+                *utrLen = this->exon[this->exon.size() - 1].end - this->cds.end + 1;
+                return true;
+            }
+        }
+        return false;
+    };
+    bool is3PrimeUtr(const int variantPos, int* utrPos, int* utrLen) {
+        if (this->isNonCoding()) return false;
+        if (this->forwardStrand) {
+            if (this->cds.end < variantPos && variantPos <= this->exon[this->exon.size() - 1].end) {
+                *utrPos = variantPos - (this->cds.end + 1) ; // +1: since this->cds.end is not in 5'-UTR region
+                *utrLen = this->exon[this->exon.size() - 1].end - this->cds.end + 1;
+                return true;
+            }
+        } else {// backward strand
+            if (this->exon[0].start <= variantPos && variantPos < this->cds.start) {
+                *utrPos = variantPos - this->cds.start - variantPos;
+                *utrLen = this->cds.start - this->exon[0].start + 1;
+                return true;
+            }
+        }
+        return false;
+    };
+    bool isExon(const int variantPos, int* exonNum, int* codonNum, int codonPos[3]){
+        if (isNonCoding()) return false;
+        *exonNum = 0;
+        *codonNum = 0;
+        bool hitExon = false;
+        // find which exon, which codon
+        if (this->forwardStrand) {
+            for (unsigned int i = 0; i < this->exon.size(); i++) {
+                if (this->exon[i].start <= variantPos && variantPos <= this->exon[i].end) {
+                    *exonNum = i;
+                    *codonNum += (variantPos - this->exon[i].start + 1);
+                    codonPos[2] = variantPos;
+                    hitExon = true;
+                } else {
+                    *codonNum += this->exon[i].end - this->exon[i].start + 1;
+                }
+            }
+            if (hitExon) {
+                codonPos[1] = variantPos - 1;
+                // TODO:
+                // continue calculate codonPos[1] and codonPos[0]
+                return true;
+            }
+        } else { // backward strand 
+
+        }
+
         return false;
     };
     bool isIntron(const int variantPos, int* intronNum){
+        // strand is not an issue here
+        for (unsigned int i = 1; i < this->exon.size(); i++) {
+            if (this->exon[i-1].end < variantPos && this->exon[i].start) {
+                return true;
+            }
+        }
         return false;
     };
     bool isSpliceSite(const int variantPos, int spliceIntoExon, int spliceIntoIntron, bool* isEssentialSpliceSite){
@@ -147,6 +233,12 @@ public:
         for (int i = 0; i < this->exon.size(); i++) {
             l += this->exon[i].getLength();
         }
+    };
+    bool isNonCoding() {
+        if (this->cds.start == this->cds.end) {
+            return true;
+        }
+        return false;
     };
 public:
     std::string name;
@@ -271,8 +363,11 @@ private:
                         std::string* annotationString){
         Gene& g = this->geneList[chr][geneIdx];
         std::vector<std::string> annotation;
-        int dist;
+        int dist2Gene;
+        int utrPos, utrLen;
         int exonNum; // which exon
+        int codonNum; // which codon
+        int codonPos[3] = {0, 0, 0}; // the codon position
         std::string codonRef;
         std::string codonAlt;
         AnnotationType type; // could be one of 
@@ -281,17 +376,28 @@ private:
                              //    START_GAIN / START_LOST ??
         int intronNum; // which intron
         bool isEssentialSpliceSite;
-        if (g.isUpstream(variantPos, param.upstreamRange, &dist)) {
+        if (g.isUpstream(variantPos, param.upstreamRange, &dist2Gene)) {
             annotation.push_back(AnnotationString[DOWNSTREAM]);
-        } else if (g.isDownstream(variantPos, param.upstreamRange, &dist)) {
+        } else if (g.isDownstream(variantPos, param.upstreamRange, &dist2Gene)) {
             annotation.push_back(AnnotationString[DOWNSTREAM]);
-        } else if (g.isExon(variantPos, &exonNum, &codonRef, &codonAlt, &type)) {
+        } else if (g.isExon(variantPos, &exonNum, &codonNum, codonPos)) {
+            annotation.push_back(AnnotationString[EXON]);
+            if (g.is5PrimeUtr(variantPos, &utrPos, &utrLen)) {
+                annotation.push_back(AnnotationString[UTR5]);
+            } else if (g.is3PrimeUtr(variantPos, &utrPos, &utrLen)) {
+                annotation.push_back(AnnotationString[UTR3]);
+            } else if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
+                annotation.push_back(AnnotationString[UTR3]);
+            }
         } else if (g.isIntron(variantPos, &intronNum)) {
-        } else if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
+            annotation.push_back(AnnotationString[INTRON]);
+            if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
+                annotation.push_back(AnnotationString[UTR3]);
+            }
         } else {
             annotation.push_back("Intergenic");
         }
-                            
+        annotationString->assign(stringJoin(annotation, ":"));
         return;
     };
     /**@return -1: unknow type
