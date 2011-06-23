@@ -153,6 +153,7 @@ class Gene{
         if (this->isInRange(variantPos, this->utr5)){
             return true;
         };
+        return false;
     };
     bool is3PrimeUtr(const int variantPos, int* utrPos, int* utrLen) {
         if (this->isNonCoding()) return false;
@@ -173,29 +174,99 @@ class Gene{
         }
         return false;
     }
-    bool calculatCodon(const int variantPos, const int exonNum, int* codonNum, int codonPos[3]){
-        /*
-        // calculate which codon it hits
-        // we did not count by 3, we count total bases from the start of CDS to variantPos
+    int nextCodonPos(const int currentPos, int* cdsIdx, const int offset) {
+        assert (offset == 1 || offset == -1);
+        int nextPos = -1;
+        if (offset == 1) {
+            nextPos = currentPos + 1;
+            if (!this->isInRange(nextPos, this->cds[*cdsIdx])) {
+                (*cdsIdx) ++;
+                if (*cdsIdx >= this->cds.size()) {
+                    return -1;
+                }
+                nextPos = this->cds[*cdsIdx].start;
+            } 
+        } else {
+            nextPos = currentPos - 1;
+            if (!this->isInRange(nextPos, this->cds[*cdsIdx])) {
+                (*cdsIdx) --;
+                if (*cdsIdx < 0) {
+                    return -1;
+                }
+                nextPos = this->cds[*cdsIdx].start;
+            } 
+        }            
+        return nextPos;
+    };
+    /**
+     * @return true: if codonPos[3] are all valid position
+     * @param codonNum : which base (inclusive, 1-based) has mutation
+     */
+    bool calculatCodon(const int variantPos, int* codonNum, int codonPos[3]){
         *codonNum = 0;
         if (this->forwardStrand) {
-        if (exonNum == 0) {
-        *codonNum += this->length(this->cds.begin, variantPos);
-        } 
-        for (unsigned int i = 1; i < exonNum; i++) {
-        *codonNum += this->length(this->exon[i].start, this->exon[i].end);
+            unsigned int i;
+            for (i = 0; i < this->cds.size() ; i++) {
+                if (this->isInRange(variantPos, this->cds[i])){ 
+                    *codonNum += variantPos - this->cds[i].start + 1;
+                    break;
+                } else {
+                    *codonNum += this->cds[i].length();
+                }
+            }
+            int n = (*codonNum) % 3;
+            int cdsIdx = i;
+            switch(n){
+            case 0:
+                codonPos[2] = variantPos;
+                codonPos[1] = nextCodonPos(codonPos[2], &cdsIdx, -1);
+                codonPos[0] = nextCodonPos(codonPos[1], &cdsIdx, -1);
+                break;
+            case 1:
+                codonPos[0] = variantPos;
+                codonPos[1] = nextCodonPos(codonPos[0], &cdsIdx, 1);
+                codonPos[2] = nextCodonPos(codonPos[1], &cdsIdx, 1);
+                break;
+            case 2:
+                codonPos[1] = variantPos;
+                codonPos[2] = nextCodonPos(codonPos[1], &cdsIdx, 1);
+                cdsIdx = i;
+                codonPos[0] = nextCodonPos(codonPos[1], &cdsIdx, -1);
+                break;
+            }
+        } else { // backward
+            int i;
+            for (i = this->cds.size() - 1; i >= 0 ; i--) {
+                if (this->isInRange(variantPos, this->cds[i])){ 
+                    *codonNum += this->cds[i].end - variantPos + 1;
+                    break;
+                } else {
+                    *codonNum += this->cds[i].length();
+                }
+            }
+            int n = (*codonNum) % 3;
+            int cdsIdx = i;
+            switch(n){
+            case 0:
+                codonPos[2] = variantPos;
+                codonPos[1] = nextCodonPos(codonPos[2], &cdsIdx, +1);
+                codonPos[0] = nextCodonPos(codonPos[1], &cdsIdx, +1);
+                break;
+            case 1:
+                codonPos[0] = variantPos;
+                codonPos[1] = nextCodonPos(codonPos[0], &cdsIdx, -1);
+                codonPos[2] = nextCodonPos(codonPos[1], &cdsIdx, -1);
+                break;
+            case 2:
+                codonPos[1] = variantPos;
+                codonPos[2] = nextCodonPos(codonPos[1], &cdsIdx, -1);
+                cdsIdx = i;
+                codonPos[0] = nextCodonPos(codonPos[1], &cdsIdx, +1);
+                break;
+            }
         }
-        *codonNum += this->length(this->exon[exonNum].start, variantPos);
-        } else {
-        if (exonNum == this->exon.size() - 1) {
-        *codonNum += this->length(variantPos, this->exon[this->exon.size() - 1].end);
-        } 
-        for (unsigned int i = this->exon.size() - 2; i != exonNum; i--) {
-        *codonNum += this->length(this->exon[i].start, this->exon[i].end);
-        }
-        *codonNum += this->length(variantPos, this->exon[exonNum].end);
-        }
-        */
+        if (codonPos[0] != -1 && codonPos[1] != -1 && codonPos[2] != -1)
+            return true;
         return false;
     };
     bool isIntron(const int variantPos, int* intronNum){

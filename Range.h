@@ -14,6 +14,7 @@ struct Range{
         if (l < 0) {
             printf("getLength() < 0 for start(%d) and end(%d)\n", start, end);
         }
+        return l;
     };
     bool inRange(int pos) {
         if (this->start <= pos && pos <= this->end) 

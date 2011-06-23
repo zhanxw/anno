@@ -21,7 +21,7 @@ class OrderedMap{
         *v = this->keyTypeMap[(*k)];
     }
     bool at(unsigned int idx, KEY* k, TYPE* v) {
-        if (idx >= this->size()) false;
+        if (idx >= this->size()) return false;
         *k = this->keyVec[idx];
         *v = this->keyTypeMap[(*k)];
         return true;

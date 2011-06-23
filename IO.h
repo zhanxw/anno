@@ -75,6 +75,7 @@ class PlainFileReader: public FileReader{
         if (!this->fp) {
             fprintf(stderr, "ERROR: Cannot open %s\n", fileName);
         }
+        return this->fp;
     }
     // close 
     void close() {
@@ -123,6 +124,7 @@ class GzipFileReader: public FileReader{
         if (!this->fp) {
             fprintf(stderr, "ERROR: Cannot open %s\n", fileName);
         }
+        return this->fp;
     }
     // close 
     void close() {
@@ -188,6 +190,7 @@ class Bzip2FileReader: public FileReader{
             fprintf(stderr, "ERROR: Cannot open %s\n", fileName);
             return NULL;
         }
+        return this->bzp;
     }
     // close 
     void close() {

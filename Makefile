@@ -1,4 +1,4 @@
-CXXFLAGS = -O2
+CXXFLAGS = -g
 all: Main
 Main: Main.cpp Gene.h Range.h
 	g++ $(CXXFLAGS) -c Main.cpp -I../statgen/lib/general
