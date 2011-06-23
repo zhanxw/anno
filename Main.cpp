@@ -106,11 +106,9 @@ public:
             g.readLine(line.c_str());
             this->geneList[g.chr].push_back(g);
         }
-        
         return;
     }; 
     void openReferenceGenome(const char* referenceGenomeFileName) {
-
         // check if -bs.umfa file exists
         std::string umfaFileName = referenceGenomeFileName;
         stringSlice(&umfaFileName, 0, -3);

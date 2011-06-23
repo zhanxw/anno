@@ -90,13 +90,13 @@ class Gene{
             }
         }
 
-#if 1 
+#if 0 
         // debug code 
         if (name == "DDX53") {
             assert ( 0 == getCDSLength() % 3 );
         }
 #endif
-#if 1
+#if 0
         // just for my curiosity
         if (!isNonCoding()) {
             if (name == "DDX53") {
