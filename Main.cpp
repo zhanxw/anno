@@ -492,11 +492,13 @@ private:
     GenomeSequence gs;
     std::map<std::string, Chromosome> reference;
 };
-
 int main(int argc, char *argv[])
 {
+
     BEGIN_PARAMETER_LIST(pl)
         ADD_STRING_PARAMETER(pl, inputFile, "-i", "Specify input VCF file")
+        ADD_STRING_PARAMETER(pl, geneFile, "-g", "Specify UCSC refFlat gene file")
+        ADD_STRING_PARAMETER(pl, referenceFile, "-r", "Specify reference genome position")
     END_PARAMETER_LIST(pl)
         ;
     
