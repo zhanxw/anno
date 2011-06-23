@@ -187,33 +187,38 @@ public:
         }
         return false;
     };
-    bool isExon(const int variantPos, int* exonNum, int* codonNum, int codonPos[3]){
+    bool isExon(const int variantPos, int* exonNum){
         if (isNonCoding()) return false;
         *exonNum = 0;
-        *codonNum = 0;
-        bool hitExon = false;
-        // find which exon, which codon
-        if (this->forwardStrand) {
-            for (unsigned int i = 0; i < this->exon.size(); i++) {
-                if (this->exon[i].start <= variantPos && variantPos <= this->exon[i].end) {
-                    *exonNum = i;
-                    *codonNum += (variantPos - this->exon[i].start + 1);
-                    codonPos[2] = variantPos;
-                    hitExon = true;
-                } else {
-                    *codonNum += this->exon[i].end - this->exon[i].start + 1;
-                }
-            }
-            if (hitExon) {
-                codonPos[1] = variantPos - 1;
-                // TODO:
-                // continue calculate codonPos[1] and codonPos[0]
+        for (unsigned int i = 0; i < this->exon.size() ; i++) {
+            if (this->isInRange(variantPos, this->exon[i].start, this->exon[i].end)) {
+                *exonNum = i;
                 return true;
             }
-        } else { // backward strand 
-
         }
-
+        return false;
+    }
+    bool calculatCodon(const int variantPos, const int exonNum, int* codonNum, int codonPos[3]){
+        // calculate which codon it hits
+        // we did not count by 3, we count total bases from the start of CDS to variantPos
+        *codonNum = 0;
+        if (this->forwardStrand) {
+            if (exonNum == 0) {
+                *codonNum += this->length(this->cds.start, variantPos);
+            } 
+            for (unsigned int i = 1; i < exonNum; i++) {
+                *codonNum += this->length(this->exon[i].start, this->exon[i].end);
+            }
+            *codonNum += this->length(this->exon[exonNum].start, variantPos);
+        } else {
+            if (exonNum == this->exon.size() - 1) {
+                *codonNum += this->length(variantPos, this->exon[this->exon.size() - 1].end);
+            } 
+            for (unsigned int i = this->exon.size() - 2; i != exonNum; i--) {
+                *codonNum += this->length(this->exon[i].start, this->exon[i].end);
+            }
+            *codonNum += this->length(variantPos, this->exon[exonNum].end);
+        }
         return false;
     };
     bool isIntron(const int variantPos, int* intronNum){
@@ -226,6 +231,38 @@ public:
         return false;
     };
     bool isSpliceSite(const int variantPos, int spliceIntoExon, int spliceIntoIntron, bool* isEssentialSpliceSite){
+        *isEssentialSpliceSite = false;
+        unsigned int exonNumber = this->exon.size();
+        // first check splice into exon
+        if (this->isInRange(variantPos, this->exon[0].end - (spliceIntoExon - 1), this->exon[0].end)) {
+            return true;
+        } 
+        if (this->isInRange(variantPos, this->exon[exonNumber - 1].start, this->exon[exonNumber - 1].start + (spliceIntoExon - 1))){
+                return true;
+        }
+        for (unsigned int i = 1; i < exonNumber - 1; i ++) {
+            if (this->isInRange(variantPos, this->exon[i].start, this->exon[i].start + (spliceIntoExon - 1)))
+                return true;
+            if (this->isInRange(variantPos, this->exon[i].end - (spliceIntoExon - 1), this->exon[i].end))
+                return true;
+        }
+        // check splice into intron (also mark isEssentialSpliceSite)
+        // we define essential splice site is (GU...AG) in the intron, and next to exon
+        // and GU, AG both have length 2.
+        for (unsigned int i = 0; i < exonNumber - 1; i++ ) {
+            if (this->isInRange(variantPos, this->exon[i].end+1, this->exon[i].end+1+2)) {
+                *isEssentialSpliceSite = true;
+                return true;
+            } else if (this->isInRange(variantPos, this->exon[i+1].start - 1 - 2, this->exon[i+1].start - 1)) {
+                *isEssentialSpliceSite = true;
+                return true;
+            }
+            if (this->isInRange(variantPos, this->exon[i].end+1, this->exon[i].end + 1 + (spliceIntoIntron - 1))) {
+                return true;
+            } else if (this->isInRange(variantPos, this->exon[i+1].start - 1 - (spliceIntoIntron - 1), this->exon[i+1].start - 1)) {
+                return true;
+            }
+        }
         return false;
     };
     int getTotalExonLength() {
@@ -240,6 +277,33 @@ public:
         }
         return false;
     };
+    /**
+     * given @param variantPos, @param exonNum (which exon the variantPos lies),
+     * @param codonNum (how many bases from the begining of cds to 
+     */
+    void calculateCodonPos(int exonNum, int codonNum, int variantPos, int codonPos[3]) {
+        
+    };
+    /**
+     * @return true if @param pos is in the range [@param beg, @param end] (inclusive on the boundaries).
+     */
+    bool isInRange(int pos, int beg, int end) {
+        if (beg > end) {
+            fprintf(stdout, "in isInRange beg(%d) > end(%d).\n", beg, end);
+        }
+        if (beg <= pos && pos <= end) 
+            return true;
+        return false;
+    };
+    /**
+     * @return the total length from @param beg to @param end, inclusive on the boundaries
+     */
+    int length(int beg, int end) {
+        if (beg > end) {
+            fprintf(stdout, "in length beg(%d) > end(%d).\n", beg, end);
+        }
+        return (end - beg + 1);
+    };
 public:
     std::string name;
     std::string chr;
@@ -252,8 +316,8 @@ struct GeneAnnotationParam{
     GeneAnnotationParam():
         upstreamRange(500),
         downstreamRange(500),
-        spliceIntoExon(2),
-        spliceIntoIntron(2) {};
+        spliceIntoExon(3),
+        spliceIntoIntron(8) {};
     int upstreamRange;      // upstream def
     int downstreamRange;    // downstream def
     int spliceIntoExon;     // essential splice site def
@@ -355,7 +419,7 @@ private:
                 }
             }
         }
-        printf("start = %d, end = %d \n", *start, *end);
+        // printf("start = %d, end = %d \n", *start, *end);
         return;
     };
     
@@ -380,19 +444,25 @@ private:
             annotation.push_back(AnnotationString[DOWNSTREAM]);
         } else if (g.isDownstream(variantPos, param.upstreamRange, &dist2Gene)) {
             annotation.push_back(AnnotationString[DOWNSTREAM]);
-        } else if (g.isExon(variantPos, &exonNum, &codonNum, codonPos)) {
+        } else if (g.isExon(variantPos, &exonNum)){//, &codonNum, codonPos)) {
             annotation.push_back(AnnotationString[EXON]);
             if (g.is5PrimeUtr(variantPos, &utrPos, &utrLen)) {
                 annotation.push_back(AnnotationString[UTR5]);
             } else if (g.is3PrimeUtr(variantPos, &utrPos, &utrLen)) {
                 annotation.push_back(AnnotationString[UTR3]);
             } else if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
-                annotation.push_back(AnnotationString[UTR3]);
+                if (isEssentialSpliceSite)
+                    annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
+                else 
+                    annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
             }
         } else if (g.isIntron(variantPos, &intronNum)) {
             annotation.push_back(AnnotationString[INTRON]);
             if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
-                annotation.push_back(AnnotationString[UTR3]);
+                if (isEssentialSpliceSite)
+                    annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
+                else 
+                    annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
             }
         } else {
             annotation.push_back("Intergenic");
