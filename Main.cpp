@@ -45,16 +45,54 @@
 #include "StringUtil.h"
 
 #include "Gene.h"
-// class Chromosome{
-// public:
-//     char operator[] (int i) {
-//     };
-//     int size() const {
-//         return ;
-//     }
-// private:
+
+
+class Codon{
+public:
+    bool open(const char* codonFile) {
+        LineReader lr(codonFile);
+        std::string line;
+        std::vector<std::string> f;
+        while(lr.readLine(&line)>0) {
+            if (line.size() > 0 && line[0] != '#') {
+                stringTokenize(line, '\t', &f);
+                this->codon2aa[f[0]] = f[1];
+                this->codon2letter[f[0]] = f[2];
+                this->codon2fullName[f[0]] = f[3];
+            };
+        }
+    };
+    const std::string& toAA(const char s[3]) {
+        std::string key;
+        key.push_back(s[0]);
+        key.push_back(s[1]);
+        key.push_back(s[2]);
+        return safeAccess(this->codon2aa, key, Codon::unknownAA);
+    };
+public:
+    static std::string unknownAA;
+    static std::string unknownLetter;
+    static std::string unknownFullName;
+private:
+    const std::string& safeAccess( const std::map<std::string, std::string>& data, 
+                                   const std::string& key,
+                                   const std::string& defaultValue) const {
+        std::map<std::string, std::string>::const_iterator it = data.find(key);
+        if (it == data.end())
+            return defaultValue;
+        return it->second;
+    }
+
+private:
+    std::map<std::string, std::string> codon2aa;        // three letter amino acid
+    std::map<std::string, std::string> codon2letter;    // amino acio letter
+    std::map<std::string, std::string> codon2fullName;  // full amino acid name
     
-// };
+};
+std::string Codon::unknownAA = "N/A";
+std::string Codon::unknownLetter = "*";
+std::string Codon::unknownFullName ="UnknownAminoAcid";
+
 class GenomeSequence{
 public:
     /**
@@ -108,15 +146,15 @@ typedef enum AnnotationType{
     SYNONYMOUS,
     NONSYNONYMOUS,
     STOP_GAIN,
-    STOP_LOST,
+    STOP_LOSS,
     START_GAIN,
-    START_LOSE,
+    START_LOSS,
     NORMAL_SPLICE_SITE,
     ESSENTIAL_SPLICE_SITE,
     INTROGENIC
 } AnnotationType;
 
-char AnnotationString[][32]= {
+const char* AnnotationString[]= {
     "Upstream", 
     "Downstream",
     "Utr5",
@@ -127,9 +165,9 @@ char AnnotationString[][32]= {
     "Synonymous",
     "Nonsynonymous",
     "Stop_Gain",
-    "Stop_Lost",
+    "Stop_Loss",
     "Start_Gain",
-    "Start_Lose",
+    "Start_Loss",
     "Normal_Splice_Site",
     "Essential_Splice_Site",
     "Introgenic"
@@ -148,7 +186,7 @@ struct GeneAnnotationParam{
 
 class GeneAnnotation{
 public:
-    void readGeneFile(const char* geneFileName){
+    void openGeneFile(const char* geneFileName){
         std::string line;
         std::vector<std::string> fields;
         LineReader lr(geneFileName);
@@ -161,6 +199,9 @@ public:
         }
         return;
     }; 
+    void openCodonFile(const char* codonFileName) {
+        this->codon.open(codonFileName);
+    };
     void openReferenceGenome(const char* referenceGenomeFileName) {
         this->gs.open(referenceGenomeFileName);
         return;
@@ -200,8 +241,8 @@ public:
             if (field.size() < 4) continue;
             std::string chr = field[0];
             int pos = toInt(field[1]);
-            std::string ref = field[3];
-            std::string alt = field[4];
+            std::string ref = toUpper(field[3]);
+            std::string alt = toUpper(field[4]);
             int geneBegin;
             int geneEnd;
             this->findInRangeGene(&geneBegin, &geneEnd, field[0], &pos);
@@ -251,7 +292,39 @@ private:
         // printf("start = %d, end = %d \n", *start, *end);
         return;
     };
-    
+    void annotateCodon(const std::string& chr, const int variantPos, const int codonNum, const int codonPos[3], 
+                       const std::string& ref, const std::string& alt,
+                       char refTriplet[3], std::string *refAAName,
+                       char altTriplet[3], std::string *altAAName,
+                       AnnotationType *at) {
+        assert(ref.size() == 1 && alt.size() == 1);
+        refTriplet[0] = this->gs[chr][codonPos[0] - 1];
+        refTriplet[1] = this->gs[chr][codonPos[1] - 1];
+        refTriplet[2] = this->gs[chr][codonPos[2] - 1];
+        altTriplet[0] = (variantPos != codonPos[0]) ? this->gs[chr][codonPos[0] - 1] : alt[0];
+        altTriplet[1] = (variantPos != codonPos[1]) ? this->gs[chr][codonPos[1] - 1] : alt[0];
+        altTriplet[2] = (variantPos != codonPos[2]) ? this->gs[chr][codonPos[2] - 1] : alt[0];
+        *refAAName = this->codon.toAA(refTriplet);
+        *altAAName = this->codon.toAA(altTriplet);
+
+        *at = calculateCodonMutationType(*refAAName, *altAAName, codonNum);
+        return ;
+    };
+    AnnotationType calculateCodonMutationType(const std::string& refAAName, const std::string& altAAName, const int codonNum){
+        if (refAAName == "Stp" && altAAName != "Stp") {
+            return STOP_LOSS;
+        } else if (refAAName != "Stp" && altAAName == "Stp") {
+            return STOP_GAIN;
+        } else if (refAAName == "Met" && altAAName != "Met" && codonNum <= 3) {
+            return START_LOSS;
+        } else if (refAAName != "Met" && altAAName == "Met" && codonNum <= 3) {
+            return START_GAIN;
+        } else if (refAAName == altAAName) {
+            return SYNONYMOUS;
+        } else {
+            return NONSYNONYMOUS;
+        }
+    };
     void annotateByGene(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
                         std::string* annotationString){
         Gene& g = this->geneList[chr][geneIdx];
@@ -281,18 +354,29 @@ private:
                 } else if (g.is3PrimeUtr(variantPos, &utrPos, &utrLen)) {
                     annotation.push_back(AnnotationString[UTR3]);
                 } else { // cds part has base change
-                    if (g.calculatCodon(variantPos, &codonNum, codonPos)) {
-                        // let's check which base, and how they are changed
-                        std::string s("pos="); 
-                        s += toString(codonPos[0]);
-                        s += toString(codonPos[1]);
-                        s += toString(codonPos[2]);
-                        if (this->gs.size()>0 && 
-                            this->gs.exists(g.chr)){
-                            s.push_back(this->gs[g.chr][codonPos[0]-1]);
-                            s.push_back(this->gs[g.chr][codonPos[1]-1]);
-                            s.push_back(this->gs[g.chr][codonPos[2]-1]);
-                         }
+                    if (g.calculatCodonPosition(variantPos, &codonNum, codonPos)) {
+                        char refTriplet[3];
+                        char altTriplet[3];
+                        std::string refAAName;
+                        std::string altAAName;
+                        AnnotationType annotationType;
+                        this->annotateCodon(chr, variantPos, codonNum, codonPos, ref, alt,
+                                            refTriplet, &refAAName,
+                                            altTriplet, &altAAName,
+                                            &annotationType);
+                        std::string s;
+                        s = AnnotationString[annotationType];
+                        s += refTriplet[0];
+                        s += refTriplet[1];
+                        s += refTriplet[2];
+                        s += ":";
+                        s += refAAName;
+                        s += "->";
+                        s += altTriplet[0];
+                        s += altTriplet[1];
+                        s += altTriplet[2];
+                        s += ":";
+                        s += altAAName;
                         annotation.push_back(s);
                     } else {
                         annotation.push_back(AnnotationString[SNV]);
@@ -341,6 +425,7 @@ private:
     std::map <std::string, std::vector<Gene> > geneList;
     std::string annotation;
     GenomeSequence gs;
+    Codon codon;
 };
 int main(int argc, char *argv[])
 {
@@ -356,7 +441,8 @@ int main(int argc, char *argv[])
     pl.Status();
     
     GeneAnnotation ga;
-    ga.readGeneFile("test.gene.txt");
+    ga.openGeneFile("test.gene.txt");
+    ga.openCodonFile("codon.txt");
     ga.openReferenceGenome("test.fa");
     ga.annotate("test.vcf", "test.output.vcf");
 

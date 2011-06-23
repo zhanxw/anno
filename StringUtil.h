@@ -56,8 +56,25 @@ std::string stringJoin(const std::vector<std::string>& input, const std::string&
     s = input[0];
     for (unsigned int i = 1; i < input.size(); i++) {
         s+= delim;
-        s+= input[1];
+        s+= input[i];
     }
     return s;
 };
+
+std::string toUpper(const std::string& s) {
+    std::string r;
+    for (unsigned int i = 0; i < s.size(); i++) {
+        r.push_back(toupper(s[i]));
+    }
+    return r;
+};
+
+std::string toLower(const std::string& s) {
+    std::string r;
+    for (unsigned int i = 0; i < s.size(); i++) {
+        r.push_back(toupper(s[i]));
+    }
+    return r;
+};
+
 #endif /* _STRINGUTIL_H_ */
