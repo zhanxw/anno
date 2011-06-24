@@ -259,16 +259,26 @@ private:
         if (gLen == 0) {
             return;
         } 
-
         int maxDist = (param.upstreamRange > param.downstreamRange) ? param.upstreamRange : param.downstreamRange;
         Range r ((*pos - maxDist), (*pos + maxDist));
         for (unsigned int i = 0; i < gLen; i++ ){
-            if (r.isInRange(g[i].tx.end)) {
+            if (g[i].tx.start <= r.start) {
+                if (g[i].tx.end < r.start){
+                    continue;
+                } else 
+                    potentialGeneIdx->push_back(i);
+            } else if (r.isInRange(g[i].tx.start)) {
                 potentialGeneIdx->push_back(i);
-            } else if (g[i].tx.start > r.end){
+            } else {
                 break;
             }
         }
+#if 1
+        for (unsigned int i = 0 ; i < potentialGeneIdx->size() ; i++){
+            printf("%d, ", (*potentialGeneIdx)[i]);
+        }
+        printf("\n");
+#endif
         return;
     };
     void annotateCodon(const std::string& chr, const int variantPos, const int codonNum, const int codonPos[3], 
@@ -277,12 +287,20 @@ private:
                        char altTriplet[3], std::string *altAAName,
                        AnnotationType *at) {
         assert(ref.size() == 1 && alt.size() == 1);
-        refTriplet[0] = this->gs[chr][codonPos[0] - 1];
-        refTriplet[1] = this->gs[chr][codonPos[1] - 1];
-        refTriplet[2] = this->gs[chr][codonPos[2] - 1];
-        altTriplet[0] = (variantPos != codonPos[0]) ? this->gs[chr][codonPos[0] - 1] : alt[0];
-        altTriplet[1] = (variantPos != codonPos[1]) ? this->gs[chr][codonPos[1] - 1] : alt[0];
-        altTriplet[2] = (variantPos != codonPos[2]) ? this->gs[chr][codonPos[2] - 1] : alt[0];
+        const std::string& seq = this->gs[chr];
+        if (codonPos[0] < 0 || codonPos[2] > seq.size()) {
+            refTriplet[0] = refTriplet[1] = refTriplet[2] = 'N';
+            altTriplet[0] = altTriplet[1] = altTriplet[2] = 'N';
+        } else {
+            refTriplet[0] = seq[codonPos[0] - 1];
+            refTriplet[1] = seq[codonPos[1] - 1];
+            refTriplet[2] = seq[codonPos[2] - 1];
+            altTriplet[0] = (variantPos != codonPos[0]) ? seq[codonPos[0] - 1] : alt[0];
+            altTriplet[1] = (variantPos != codonPos[1]) ? seq[codonPos[1] - 1] : alt[0];
+            altTriplet[2] = (variantPos != codonPos[2]) ? seq[codonPos[2] - 1] : alt[0];
+        }
+
+        // obtain AA name
         *refAAName = this->codon.toAA(refTriplet);
         *altAAName = this->codon.toAA(altTriplet);
 
@@ -290,7 +308,9 @@ private:
         return ;
     };
     AnnotationType calculateCodonMutationType(const std::string& refAAName, const std::string& altAAName, const int codonNum){
-        if (refAAName == "Stp" && altAAName != "Stp") {
+        if (refAAName == Codon::unknownAA || altAAName == Codon::unknownAA) {
+            return SNV;
+        } else if (refAAName == "Stp" && altAAName != "Stp") {
             return STOP_LOSS;
         } else if (refAAName != "Stp" && altAAName == "Stp") {
             return STOP_GAIN;
@@ -379,7 +399,7 @@ private:
                     annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
             }
         } else {
-            annotation.push_back("Intergenic");
+            //annotation.push_back("Intergenic");
         }
         annotationString->assign(stringJoin(annotation, ":"));
         return;

@@ -13,3 +13,7 @@ Main: Main.cpp Gene.h Range.h
 	g++ $(CXXFLAGS) -o Main Main.o ../statgen/lib/libStatGen.a -lz -lbz2 -lssl -lcrypto
 clean:
 	rm -f *.o Main
+test1: Main
+	./Main -i test.vcf -r test.fa -g test.gene.txt
+test2: Main
+	./Main -i 100.vcf.gz -r test.fa -g refFlat_hg19.txt.gz
