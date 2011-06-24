@@ -438,9 +438,25 @@ int main(int argc, char *argv[])
         ;
     
     pl.Read(argc, argv);
-    pl.Status();
 #if 1
     GeneAnnotation ga;
+    if (FLAG_inputFile.size() == 0) {
+        pl.Help();
+        fprintf(stderr, "Please specify input file\n");
+        exit(1);
+    }
+    if (FLAG_geneFile.size() == 0) {
+        pl.Help();
+        fprintf(stderr, "Please specify gene file\n");
+        exit(1);
+    }
+    if (FLAG_referenceFile.size() == 0) {
+        pl.Help();
+        fprintf(stderr, "Please specify reference genome file\n");
+        exit(1);
+    }
+
+    pl.Status();
     ga.openGeneFile(FLAG_geneFile.c_str());
     ga.openCodonFile("codon.txt");
     ga.openReferenceGenome(FLAG_referenceFile.c_str());

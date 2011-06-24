@@ -1,8 +1,12 @@
 #ifndef _GENE_H_
 #define _GENE_H_
 #include "Range.h"
+#include "StringUtil.h"
+
 class Gene{
   public:
+    // read refFlat file into internal data structure
+    // chr1 will be chopped to 1.
     void readLine(const char* line) {
         std::vector< std::string > field;
         std::vector< std::string > exon_beg;
@@ -18,7 +22,7 @@ class Gene{
             return;
         }
         this->name = field[0];
-        this->chr = field[2];
+        this->chr = chopChr(field[2]);
         this->forwardStrand = (field[3] == "+" ? true: false);
         this->tx.start = toInt(field[4]) + 1;
         this->tx.end = toInt(field[5]);

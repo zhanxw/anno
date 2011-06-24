@@ -77,4 +77,15 @@ std::string toLower(const std::string& s) {
     return r;
 };
 
+// remove the leading 'chr' if any
+std::string chopChr(const std::string& s) {
+    if (s.size() > 3 && 
+        (s[0] == 'c' || s[0] == 'C') &&
+        (s[1] == 'h' || s[1] == 'H') &&
+        (s[2] == 'r' || s[2] == 'R')){
+        return s.substr(3);
+    }
+    return s;
+};
+
 #endif /* _STRINGUTIL_H_ */
