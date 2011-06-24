@@ -16,4 +16,4 @@ clean:
 test1: Main
 	./Main -i test.vcf -r test.fa -g test.gene.txt
 test2: Main
-	./Main -i 100.vcf -r test.fa -g refFlat_hg19.txt.gz
+	./Main -i 100.vcf.gz -r test.fa -g refFlat_hg19.txt.gz
