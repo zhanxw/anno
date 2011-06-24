@@ -391,5 +391,10 @@ class Gene{
     std::vector<Range> utr3;
     bool isNonCodingGene;
 };
-
+bool GeneStartCompareLess(const Gene& a, const Gene& b) {
+    return a.tx.start < b.tx.start;
+};
+bool GeneEndCompareLess(const Gene& a, const Gene& b) {
+    return a.tx.end < b.tx.end;
+};
 #endif /* _GENE_H_ */

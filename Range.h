@@ -22,4 +22,5 @@ struct Range{
         return false;
     };
 };
+
 #endif /* _RANGE_H_ */

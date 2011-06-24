@@ -39,6 +39,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <algorithm>
 
 #include "Argument.h"
 #include "IO.h"
@@ -197,6 +198,8 @@ public:
             g.readLine(line.c_str());
             this->geneList[g.chr].push_back(g);
         }
+        // make sure genes are ordered
+        this->sortGene();
         return;
     }; 
     void openCodonFile(const char* codonFileName) {
@@ -205,39 +208,16 @@ public:
     void openReferenceGenome(const char* referenceGenomeFileName) {
         this->gs.open(referenceGenomeFileName);
         return;
-/*
-        std::string line;
-        std::vector<std::string> fields;
-        LineReader lr(geneFileName);
-
-        // check if -bs.umfa file exists
-        std::string umfaFileName = referenceGenomeFileName;
-        stringSlice(&umfaFileName, 0, -3);
-        umfaFileName += "-bs.umfa";
-        FILE* fp = fopen(umfaFileName.c_str(), "r");
-        this->gs.setReferenceName(referenceGenomeFileName);
-        if (fp == NULL) { // does not exist binary format, so try to create one
-            fprintf(stdout, "Create binary reference genome file for the first run\n");
-            this->gs.create();
-        } else{
-            fclose(fp);
-        }
-        if (this->gs.open()) {
-            fprintf(stderr, "Cannot open reference genome file %s\n", referenceGenomeFileName);
-            exit(1);
-        }
-        if (!convert2Chromosome(&this->gs, &this->reference)) {
-            fprintf(stderr, "Cannot use GenomeSequence by Chromosome.\n");
-            exit(1);
-        }
-*/
     };
     // we take a VCF input file for now
     void annotate(const char* inputFileName, const char* outputFileName){
         std::string annotationString;
         LineReader lr(inputFileName);
         std::vector<std::string> field;
-        while (lr.readLineBySep(&field, "\t") > 0) {
+        std::string line;
+        while(lr.readLine(&line) > 0) {
+            if (line.size() == 0 || line[0] == '#') continue;
+            stringTokenize(line, "\t", &field);
             if (field.size() < 4) continue;
             std::string chr = field[0];
             int pos = toInt(field[1]);
@@ -262,6 +242,13 @@ public:
         this->param = param;
     };
 private:
+    // make sure genes are ordered
+    void sortGene() {
+        std::map<std::string, std::vector<Gene> >:: iterator it;
+        for (it = this->geneList.begin(); it != this->geneList.end(); it ++){
+            std::sort( it->second.begin(), it->second.end(), GeneStartCompareLess);
+        }
+    };
     // store results in start and end, index are 0-based, inclusive
     // find gene whose range plus downstream/upstream overlaps chr:pos 
     void findInRangeGene(int* start, int* end, const std::string& chr, int* pos) {
@@ -271,25 +258,62 @@ private:
         if (g.size() == 0) {
             return;
         } 
+        int maxDist = (param.upstreamRange > param.downstreamRange) ? param.upstreamRange : param.downstreamRange;
+        // find the idx of a gene which its rightmost pos (tx.end) is  less than (*pos - maxDist)
         unsigned int gLen = g.size();
-        for (unsigned int i = 0; i < gLen ; i++) {
-            if (g[i].forwardStrand) { // forward strand
-                if (g[i].tx.start - param.upstreamRange < (*pos) && (*pos) < g[i].tx.end + param.downstreamRange) {
-                    if (*start < 0) {
-                        *start = i;
-                    }
-                    *end = i;
-                }
-            } else { // reverse strand
-                if (g[i].tx.start - param.downstreamRange < *pos && *pos < g[i].tx.end + param.upstreamRange) {
-                    if (*start < 0) {
-                        *start = i;
-                    }
-                    *end = i;
-                }
+        int idx = 0;
+        unsigned int step = gLen;
+        unsigned int count = gLen;
+        unsigned int tryIdx;
+        int bound = (*pos - maxDist);
+        while (step > 0) {
+            tryIdx= idx; step = count/2; tryIdx += step;
+            if (g[tryIdx].tx.end < bound) {
+                idx = tryIdx;
+                count -= step;
+            } else {
+                count = step;
             }
+        };
+        *start = idx;
+
+#if 1
+        // debug code
+        assert( idx < gLen);
+        if (idx < gLen - 1) {
+            assert(g[idx+1].tx.end >= bound);
         }
-        // printf("start = %d, end = %d \n", *start, *end);
+        Gene auxGene;
+        auxGene.tx.end = bound;
+        unsigned int stl_idx = std::lower_bound(g.begin(), g.end(), auxGene, GeneEndCompareLess) - g.begin();
+        assert( idx == stl_idx - 1 || stl_idx == 0);
+#endif
+        // find the idx of a gene which its leftmost pos (tx.start) is  larger than (*pos + maxDist)
+        count = gLen - ( (*start) + 1);
+        step = count;
+        bound = (*pos + maxDist);
+        idx = gLen - 1;
+        while (step >0) {
+            tryIdx = idx; step = count /2 ; tryIdx -= step;
+            if (g[tryIdx].tx.start > bound) {
+                idx = tryIdx;
+                count -= step;
+            } else {
+                count = step;
+            }
+        };
+        *end = idx;
+#if 1
+        // debug code
+        assert( idx >= 0);
+        if (idx > 0) {
+            assert(g[idx-1].tx.start <= bound);
+        }
+        auxGene.tx.start = bound;
+        stl_idx = std::upper_bound(g.begin(), g.end(), auxGene, GeneStartCompareLess) - g.begin();
+        assert( idx == stl_idx || stl_idx == gLen);
+#endif
+        printf("start = %d, end = %d \n", *start, *end);
         return;
     };
     void annotateCodon(const std::string& chr, const int variantPos, const int codonNum, const int codonPos[3], 
