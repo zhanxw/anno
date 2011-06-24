@@ -34,7 +34,7 @@ int stringTokenize(const std::string& str, const char delim, std::vector<std::st
 void stringStrip(std::string* input, const char* characters = " ") {
     size_t beg = input->find_first_not_of(characters);
     size_t end = input->find_last_not_of(characters);
-    input->assign( input->substr(beg, end-beg) );
+    input->assign( input->substr(beg, end - beg + 1) );
 };
 
 //extract piece of string from @param beg(inclusive) to @param end(exclusive)

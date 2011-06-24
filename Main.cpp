@@ -46,7 +46,7 @@
 #include "StringUtil.h"
 
 #include "Gene.h"
-
+#include "GeneFormat.h"
 
 class Codon{
 public:
@@ -187,6 +187,16 @@ struct GeneAnnotationParam{
 
 class GeneAnnotation{
 public:
+    void setFormat(const std::string& f) {
+        if (f == "refFlat") {
+            this->format.setRefFlatFormat();
+        } else if (f == "knownGene") {
+            this->format.setUCSCKnownGeneFormat();
+        } else {
+            fprintf(stderr, "Unknown format!\nNow quitting...\n");
+        }
+    };
+
     void openGeneFile(const char* geneFileName){
         std::string line;
         std::vector<std::string> fields;
@@ -195,7 +205,7 @@ public:
             stringStrip(&line);
             if (line.size()>0 && line[0] == '#' || line.size() == 0) continue; // skip headers and empty lines
             Gene g;
-            g.readLine(line.c_str());
+            g.readLine(line.c_str(), this->format);
             this->geneList[g.chr].push_back(g);
         }
         // make sure genes are ordered
@@ -228,7 +238,7 @@ public:
             if (potentialGeneIdx.size() == 0) continue;
             annotationString.clear();
             for (unsigned int i = 0; i < potentialGeneIdx.size(); i++) {
-                this->annotateByGene(i, chr, pos, ref, alt, &annotationString);
+                this->annotateByGene(potentialGeneIdx[i], chr, pos, ref, alt, &annotationString);
                 printf("%s %d ref=%s alt=%s has annotation: %s\n",
                        chr.c_str(), pos, 
                        ref.c_str(), alt.c_str(),
@@ -273,7 +283,7 @@ private:
                 break;
             }
         }
-#if 1
+#if 0
         for (unsigned int i = 0 ; i < potentialGeneIdx->size() ; i++){
             printf("%d, ", (*potentialGeneIdx)[i]);
         }
@@ -359,6 +369,8 @@ private:
                         std::string refAAName;
                         std::string altAAName;
                         AnnotationType annotationType;
+                        // when reference genome is provided
+                        if (this->gs.size() >0){
                         this->annotateCodon(chr, variantPos, codonNum, codonPos, ref, alt,
                                             refTriplet, &refAAName,
                                             altTriplet, &altAAName,
@@ -377,6 +389,9 @@ private:
                         s += ":";
                         s += altAAName;
                         annotation.push_back(s);
+                        } else {
+                            annotation.push_back(AnnotationString[SNV]);
+                        }
                     } else {
                         annotation.push_back(AnnotationString[SNV]);
                     }
@@ -401,7 +416,9 @@ private:
         } else {
             //annotation.push_back("Intergenic");
         }
-        annotationString->assign(stringJoin(annotation, ":"));
+        *annotationString = g.name;
+        annotationString->push_back(':');
+        *annotationString+=(stringJoin(annotation, ":"));
         return;
     };
     /**@return -1: unknow type
@@ -425,18 +442,23 @@ private:
     std::string annotation;
     GenomeSequence gs;
     Codon codon;
+    GeneFormat format;
 };
 int main(int argc, char *argv[])
 {
 
     BEGIN_PARAMETER_LIST(pl)
         ADD_STRING_PARAMETER(pl, inputFile, "-i", "Specify input VCF file")
-        ADD_STRING_PARAMETER(pl, geneFile, "-g", "Specify UCSC refFlat gene file")
+        ADD_STRING_PARAMETER(pl, geneFile, "-g", "Specify gene file")
         ADD_STRING_PARAMETER(pl, referenceFile, "-r", "Specify reference genome position")
+        ADD_STRING_PARAMETER(pl, geneFileFormat, "-f", "Specify gene file format (default: refFlat, other options knownGene)")
     END_PARAMETER_LIST(pl)
         ;
     
     pl.Read(argc, argv);
+    if (FLAG_geneFileFormat.size() == 0) {
+        FLAG_geneFileFormat = "refFlat";
+    }        
 #if 1
     GeneAnnotation ga;
     if (FLAG_inputFile.size() == 0) {
@@ -449,20 +471,19 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Please specify gene file\n");
         exit(1);
     }
-    if (FLAG_referenceFile.size() == 0) {
-        pl.Help();
-        fprintf(stderr, "Please specify reference genome file\n");
-        exit(1);
-    }
 
     pl.Status();
+    if (FLAG_referenceFile.size() != 0) {
+        ga.openReferenceGenome(FLAG_referenceFile.c_str());
+        ga.openCodonFile("codon.txt");
+    }
+
+    ga.setFormat(FLAG_geneFileFormat);
     ga.openGeneFile(FLAG_geneFile.c_str());
-    ga.openCodonFile("codon.txt");
-    ga.openReferenceGenome(FLAG_referenceFile.c_str());
     ga.annotate(FLAG_inputFile.c_str(), "test.output.vcf");
 #else
-    
     GeneAnnotation ga;
+    ga.setFormat(FLAG_geneFileFormat);
     ga.openGeneFile("test.gene.txt");
     ga.openCodonFile("codon.txt");
     ga.openReferenceGenome("test.fa");

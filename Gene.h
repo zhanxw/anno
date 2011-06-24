@@ -1,5 +1,6 @@
 #ifndef _GENE_H_
 #define _GENE_H_
+#include "GeneFormat.h"
 #include "Range.h"
 #include "StringUtil.h"
 
@@ -7,12 +8,12 @@ class Gene{
   public:
     // read refFlat file into internal data structure
     // chr1 will be chopped to 1.
-    void readLine(const char* line) {
+    void readLine(const char* line, const GeneFormat& format) {
         std::vector< std::string > field;
         std::vector< std::string > exon_beg;
         std::vector< std::string > exon_end;
         int nf = stringTokenize(line, "\t", &field);
-        if (nf < 11) { 
+        if (nf != format.size()) { 
             static int nTimeError = 0;
             fprintf(stderr, "Unable to read this gene from: %s\n", line);
             if (nTimeError++ > 10) {
@@ -21,21 +22,28 @@ class Gene{
             }
             return;
         }
-        this->name = field[0];
-        this->chr = chopChr(field[2]);
-        this->forwardStrand = (field[3] == "+" ? true: false);
-        this->tx.start = toInt(field[4]) + 1;
-        this->tx.end = toInt(field[5]);
-        int cdsStart = toInt(field[6]) + 1;
-        int cdsEnd = toInt(field[7]);
+        // read name
+        for (unsigned int i = 0; i < format.nameCol.size(); i++) {
+            if (i) {
+                this->name += "/";
+            }
+            this->name += field[format.nameCol[i]];
+        }
+        // read others
+        this->chr = chopChr(field[format.chrCol]);
+        this->forwardStrand = (field[format.strandCol] == "+" ? true: false);
+        this->tx.start = toInt(field[format.txStartCol]) + 1;
+        this->tx.end = toInt(field[format.txEndCol]);
+        int cdsStart = toInt(field[format.cdsStartCol]) + 1;
+        int cdsEnd = toInt(field[format.cdsEndCol]);
         if (this->length(cdsStart, cdsEnd) == 0) {
             this->isNonCodingGene = true;
         } else {
             this->isNonCodingGene = false;
         }
-        unsigned int nExon = toInt(field[8]);
-        stringTokenize(field[9], ',', &exon_beg);
-        stringTokenize(field[10], ',', &exon_end);
+        unsigned int nExon = toInt(field[format.exonNumCol]);
+        stringTokenize(field[format.exonStartCol], ',', &exon_beg);
+        stringTokenize(field[format.exonEndCol], ',', &exon_end);
         for (unsigned int i = 0; i < nExon; i++ ){
             this->exon.push_back(Range(toInt(exon_beg[i]) + 1, toInt(exon_end[i])));
         }
@@ -43,9 +51,9 @@ class Gene{
             // we will assume this is forward strand
             // if this is not the case, we will swap utr5 and utr3
 
-            if (name == "TMEM88B") {
-                printf("\n");
-            }
+            /* if (name == "TMEM88B") { */
+            /*     printf("\n"); */
+            /* } */
             
             // load till left of cdsBegin
             unsigned i = 0;
@@ -276,7 +284,7 @@ class Gene{
     bool isIntron(const int variantPos, int* intronNum){
         // strand is not an issue here
         for (unsigned int i = 1; i < this->exon.size(); i++) {
-            if (this->exon[i-1].end < variantPos && this->exon[i].start) {
+            if (this->exon[i-1].end < variantPos && variantPos < this->exon[i].start) {
                 return true;
             }
         }
@@ -390,6 +398,7 @@ class Gene{
     std::vector<Range> utr5;
     std::vector<Range> utr3;
     bool isNonCodingGene;
+    GeneFormat format;
 };
 bool GeneStartCompareLess(const Gene& a, const Gene& b) {
     return a.tx.start < b.tx.start;
