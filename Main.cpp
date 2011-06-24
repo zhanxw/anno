@@ -439,12 +439,19 @@ int main(int argc, char *argv[])
     
     pl.Read(argc, argv);
     pl.Status();
+#if 1
+    GeneAnnotation ga;
+    ga.openGeneFile(FLAG_geneFile.c_str());
+    ga.openCodonFile("codon.txt");
+    ga.openReferenceGenome(FLAG_referenceFile.c_str());
+    ga.annotate(FLAG_inputFile.c_str(), "test.output.vcf");
+#else
     
     GeneAnnotation ga;
     ga.openGeneFile("test.gene.txt");
     ga.openCodonFile("codon.txt");
     ga.openReferenceGenome("test.fa");
     ga.annotate("test.vcf", "test.output.vcf");
-
+#endif
     return 0;
 }
