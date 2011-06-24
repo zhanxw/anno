@@ -223,12 +223,11 @@ public:
             int pos = toInt(field[1]);
             std::string ref = toUpper(field[3]);
             std::string alt = toUpper(field[4]);
-            int geneBegin;
-            int geneEnd;
-            this->findInRangeGene(&geneBegin, &geneEnd, field[0], &pos);
-            if (geneEnd < 0) continue;
+            std::vector<unsigned> potentialGeneIdx;
+            this->findInRangeGene(field[0], &pos, &potentialGeneIdx);
+            if (potentialGeneIdx.size() == 0) continue;
             annotationString.clear();
-            for (unsigned int i = geneBegin; i <= geneEnd; i++) {
+            for (unsigned int i = 0; i < potentialGeneIdx.size(); i++) {
                 this->annotateByGene(i, chr, pos, ref, alt, &annotationString);
                 printf("%s %d ref=%s alt=%s has annotation: %s\n",
                        chr.c_str(), pos, 
@@ -249,71 +248,27 @@ private:
             std::sort( it->second.begin(), it->second.end(), GeneStartCompareLess);
         }
     };
-    // store results in start and end, index are 0-based, inclusive
+    // store results in @param potentialGeneIdx
     // find gene whose range plus downstream/upstream overlaps chr:pos 
-    void findInRangeGene(int* start, int* end, const std::string& chr, int* pos) {
-        *start = -1;
-        *end = -1;
+    void findInRangeGene(const std::string& chr, int* pos, std::vector<unsigned int>* potentialGeneIdx) {
+        assert(potentialGeneIdx);
+        potentialGeneIdx->clear();
+
         std::vector<Gene>& g = this->geneList[chr];
-        if (g.size() == 0) {
+        unsigned int gLen = g.size();
+        if (gLen == 0) {
             return;
         } 
-        int maxDist = (param.upstreamRange > param.downstreamRange) ? param.upstreamRange : param.downstreamRange;
-        // find the idx of a gene which its rightmost pos (tx.end) is  less than (*pos - maxDist)
-        unsigned int gLen = g.size();
-        int idx = 0;
-        unsigned int step = gLen;
-        unsigned int count = gLen;
-        unsigned int tryIdx;
-        int bound = (*pos - maxDist);
-        while (step > 0) {
-            tryIdx= idx; step = count/2; tryIdx += step;
-            if (g[tryIdx].tx.end < bound) {
-                idx = tryIdx;
-                count -= step;
-            } else {
-                count = step;
-            }
-        };
-        *start = idx;
 
-#if 1
-        // debug code
-        assert( idx < gLen);
-        if (idx < gLen - 1) {
-            assert(g[idx+1].tx.end >= bound);
-        }
-        Gene auxGene;
-        auxGene.tx.end = bound;
-        unsigned int stl_idx = std::lower_bound(g.begin(), g.end(), auxGene, GeneEndCompareLess) - g.begin();
-        assert( idx == stl_idx - 1 || stl_idx == 0);
-#endif
-        // find the idx of a gene which its leftmost pos (tx.start) is  larger than (*pos + maxDist)
-        count = gLen - ( (*start) + 1);
-        step = count;
-        bound = (*pos + maxDist);
-        idx = gLen - 1;
-        while (step >0) {
-            tryIdx = idx; step = count /2 ; tryIdx -= step;
-            if (g[tryIdx].tx.start > bound) {
-                idx = tryIdx;
-                count -= step;
-            } else {
-                count = step;
+        int maxDist = (param.upstreamRange > param.downstreamRange) ? param.upstreamRange : param.downstreamRange;
+        Range r ((*pos - maxDist), (*pos + maxDist));
+        for (unsigned int i = 0; i < gLen; i++ ){
+            if (r.isInRange(g[i].tx.end)) {
+                potentialGeneIdx->push_back(i);
+            } else if (g[i].tx.start > r.end){
+                break;
             }
-        };
-        *end = idx;
-#if 1
-        // debug code
-        assert( idx >= 0);
-        if (idx > 0) {
-            assert(g[idx-1].tx.start <= bound);
         }
-        auxGene.tx.start = bound;
-        stl_idx = std::upper_bound(g.begin(), g.end(), auxGene, GeneStartCompareLess) - g.begin();
-        assert( idx == stl_idx || stl_idx == gLen);
-#endif
-        printf("start = %d, end = %d \n", *start, *end);
         return;
     };
     void annotateCodon(const std::string& chr, const int variantPos, const int codonNum, const int codonPos[3], 

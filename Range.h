@@ -16,7 +16,7 @@ struct Range{
         }
         return l;
     };
-    bool inRange(int pos) {
+    bool isInRange(int pos) {
         if (this->start <= pos && pos <= this->end) 
             return true;
         return false;
