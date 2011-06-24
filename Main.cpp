@@ -260,12 +260,25 @@ private:
         } 
         int maxDist = (param.upstreamRange > param.downstreamRange) ? param.upstreamRange : param.downstreamRange;
         // find the idx of a gene which its rightmost pos (tx.end) is  less than (*pos - maxDist)
+        // we cannot use binary search here, as the gene not sorted by its tx.end
+        // however, the search range is from [0 .. ub] where ub meaning g[x].tx.start < (*pos - maxDist)
+        int leftBound = (*pos - maxDist);
+        Gene auxGene;
+        auxGene.tx.start = leftBound;
+        unsigned int startMax = std::lower_bound(g.begin(), g.end(), auxGene, GeneStartCompareLess);
+        for (unsigned int i = 0; i < startMax; i++) {
+            if (g[i].tx.end >= leftBound) {
+                *start = i -1;
+                break;
+            }
+        }
+
         unsigned int gLen = g.size();
         int idx = 0;
         unsigned int step = gLen;
         unsigned int count = gLen;
         unsigned int tryIdx;
-        int bound = (*pos - maxDist);
+
         while (step > 0) {
             tryIdx= idx; step = count/2; tryIdx += step;
             if (g[tryIdx].tx.end < bound) {
@@ -277,12 +290,12 @@ private:
         };
         *start = idx;
 
-#if 1
         // debug code
         assert( idx < gLen);
         if (idx < gLen - 1) {
             assert(g[idx+1].tx.end >= bound);
         }
+#if 0
         Gene auxGene;
         auxGene.tx.end = bound;
         unsigned int stl_idx = std::lower_bound(g.begin(), g.end(), auxGene, GeneEndCompareLess) - g.begin();
@@ -303,17 +316,20 @@ private:
             }
         };
         *end = idx;
-#if 1
+        if (g[idx].tx.end < (*pos - maxDist)) {
+            *end = -1;
+        }
         // debug code
         assert( idx >= 0);
         if (idx > 0) {
             assert(g[idx-1].tx.start <= bound);
         }
+#if 0
         auxGene.tx.start = bound;
         stl_idx = std::upper_bound(g.begin(), g.end(), auxGene, GeneStartCompareLess) - g.begin();
         assert( idx == stl_idx || stl_idx == gLen);
 #endif
-        printf("start = %d, end = %d \n", *start, *end);
+        // printf("start = %d, end = %d \n", *start, *end);
         return;
     };
     void annotateCodon(const std::string& chr, const int variantPos, const int codonNum, const int codonPos[3], 
@@ -322,12 +338,20 @@ private:
                        char altTriplet[3], std::string *altAAName,
                        AnnotationType *at) {
         assert(ref.size() == 1 && alt.size() == 1);
-        refTriplet[0] = this->gs[chr][codonPos[0] - 1];
-        refTriplet[1] = this->gs[chr][codonPos[1] - 1];
-        refTriplet[2] = this->gs[chr][codonPos[2] - 1];
-        altTriplet[0] = (variantPos != codonPos[0]) ? this->gs[chr][codonPos[0] - 1] : alt[0];
-        altTriplet[1] = (variantPos != codonPos[1]) ? this->gs[chr][codonPos[1] - 1] : alt[0];
-        altTriplet[2] = (variantPos != codonPos[2]) ? this->gs[chr][codonPos[2] - 1] : alt[0];
+        const std::string& seq = this->gs[chr];
+        if (codonPos[0] < 0 || codonPos[2] > seq.size()) {
+            refTriplet[0] = refTriplet[1] = refTriplet[2] = 'N';
+            altTriplet[0] = altTriplet[1] = altTriplet[2] = 'N';
+        } else {
+            refTriplet[0] = seq[codonPos[0] - 1];
+            refTriplet[1] = seq[codonPos[1] - 1];
+            refTriplet[2] = seq[codonPos[2] - 1];
+            altTriplet[0] = (variantPos != codonPos[0]) ? seq[codonPos[0] - 1] : alt[0];
+            altTriplet[1] = (variantPos != codonPos[1]) ? seq[codonPos[1] - 1] : alt[0];
+            altTriplet[2] = (variantPos != codonPos[2]) ? seq[codonPos[2] - 1] : alt[0];
+        }
+
+        // obtain AA name
         *refAAName = this->codon.toAA(refTriplet);
         *altAAName = this->codon.toAA(altTriplet);
 
@@ -335,7 +359,9 @@ private:
         return ;
     };
     AnnotationType calculateCodonMutationType(const std::string& refAAName, const std::string& altAAName, const int codonNum){
-        if (refAAName == "Stp" && altAAName != "Stp") {
+        if (refAAName == Codon::unknownAA || altAAName == Codon::unknownAA) {
+            return SNV;
+        } else if (refAAName == "Stp" && altAAName != "Stp") {
             return STOP_LOSS;
         } else if (refAAName != "Stp" && altAAName == "Stp") {
             return STOP_GAIN;
@@ -424,7 +450,7 @@ private:
                     annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
             }
         } else {
-            annotation.push_back("Intergenic");
+            //annotation.push_back("Intergenic");
         }
         annotationString->assign(stringJoin(annotation, ":"));
         return;
