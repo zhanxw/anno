@@ -36,6 +36,10 @@ bool str2int(const char* input, int* output) {
     return true;
 }
 
+bool str2int(const std::string& input, int* output) {
+    return str2int(input.c_str(), output);
+}
+
 int toInt(const char* input) {
     return (atoi(input));
 };

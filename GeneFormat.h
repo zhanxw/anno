@@ -1,6 +1,7 @@
 #ifndef _GENEFORMAT_H_
 #define _GENEFORMAT_H_
-
+//TODO
+//Use format.txt to flexible specify inputs
 class GeneFormat{
 public:
     void setRefFlatFormat(){

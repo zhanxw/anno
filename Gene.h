@@ -1,5 +1,6 @@
 #ifndef _GENE_H_
 #define _GENE_H_
+
 #include "GeneFormat.h"
 #include "Range.h"
 #include "StringUtil.h"
@@ -32,7 +33,11 @@ class Gene{
         // read others
         this->chr = chopChr(field[format.chrCol]);
         this->forwardStrand = (field[format.strandCol] == "+" ? true: false);
-        this->tx.start = toInt(field[format.txStartCol]) + 1;
+        if (!str2int(field[format.txStartCol], &this->tx.start)) {
+            fprintf(stderr, "Gene file format error!\n");
+            exit(1);
+        }
+        this->tx.start ++;
         this->tx.end = toInt(field[format.txEndCol]);
         int cdsStart = toInt(field[format.cdsStartCol]) + 1;
         int cdsEnd = toInt(field[format.cdsEndCol]);
