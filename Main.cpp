@@ -48,6 +48,15 @@
 #include "Gene.h"
 #include "GeneFormat.h"
 
+typedef enum {
+    SNP = 0,
+    INS,
+    DEL,
+    MIXED,
+    SV,
+    UNKNOWN = 99
+} VARIATION_TYPE;
+
 char complementBase(const char c){
     switch (c){
     case 'A':
@@ -166,7 +175,7 @@ public:
     std::map<std::string, std::string> data;
 };
 
-typedef enum AnnotationType{
+typedef enum {
     UPSTREAM = 0,
     DOWNSTREAM,
     UTR5,
@@ -182,6 +191,9 @@ typedef enum AnnotationType{
     START_LOSS,
     NORMAL_SPLICE_SITE,
     ESSENTIAL_SPLICE_SITE,
+    FRAME_SHIFT,
+    CODON_GAIN,
+    CODON_LOSS,
     INTROGENIC
 } AnnotationType;
 
@@ -201,6 +213,9 @@ const char* AnnotationString[]= {
     "Start_Loss",
     "Normal_Splice_Site",
     "Essential_Splice_Site",
+    "Frameshift",
+    "CodonGain",
+    "CodonLoss",
     "Introgenic"
 };
 struct GeneAnnotationParam{
@@ -321,19 +336,6 @@ private:
 #endif
         return;
     };
-    // void annotateCodon(const std::string& chr, const int variantPos, const int codonNum, const int codonPos[3], 
-    //                    const std::string& ref, const std::string& alt,
-    //                    char refTriplet[3], std::string *refAAName,
-    //                    char altTriplet[3], std::string *altAAName,
-    //                    AnnotationType *at) {
-
-    //     // obtain AA name
-    //     *refAAName = this->codon.toAA(refTriplet);
-    //     *altAAName = this->codon.toAA(altTriplet);
-
-    //     *at = deter(*refAAName, *altAAName, codonNum);
-    //     return ;
-    // };
     /**
      * fill the actual base in @param refTriplet and @param altTriplet
      * we consider @param forwardStrand, so for forward strand, we copy from this->reference, 
@@ -386,12 +388,7 @@ private:
         int exonNum; // which exon
         int codonNum; // which codon
         int codonPos[3] = {0, 0, 0}; // the codon position
-        std::string codonRef;
-        std::string codonAlt;
         AnnotationType type; // could be one of 
-                             //    SYNONYMOUS / NONSYNONYMOUS
-                             //    STOP_GAIN / STOP_LOST
-                             //    START_GAIN / START_LOST ??
         int intronNum; // which intron
         bool isEssentialSpliceSite;
         if (g.isUpstream(variantPos, param.upstreamRange, &dist2Gene)) {
@@ -414,10 +411,6 @@ private:
                         AnnotationType annotationType;
                         // when reference genome is provided
                         if (this->gs.size() >0){
-                            // this->annotateCodon(chr, variantPos, codonNum, codonPos, ref, alt,
-                            //                     refTriplet, &refAAName,
-                            //                     altTriplet, &altAAName,
-                            //                     &annotationType);
                             this->fillTriplet(chr, variantPos, codonPos, g.forwardStrand, ref, alt, refTriplet, altTriplet);
 
                             refAAName = this->codon.toAA(refTriplet);
@@ -470,22 +463,31 @@ private:
         *annotationString+=(stringJoin(annotation, ":"));
         return;
     };
-    /**@return -1: unknow type
-     *          0: single mutation
-     *          1: deletion
-     *          2: insertion
+    /**
+     * @return the variation type depending on the first entry in the alt field
      */
-    int getMutationType(const char* ref, const char* alt) {
-        unsigned int refLen = strlen(ref);
-        unsigned int altLen = strlen(alt);
-        if (refLen == altLen) 
-            return 0;
-        else if (refLen > altLen) 
-            return 1;
-        else if (refLen < altLen)
-            return 2;
-        return -1;
+    VARIATION_TYPE determineMutationType(const std::string& ref, const std::string& alt) {
+        const char* BASE = "ACGT";
+        unsigned int refLen = ref.size();
+        unsigned int altLen = alt.size();
+        if (alt.find_first_not_of(BASE) != std::string::npos) { 
+            //contain 
+            return SV;
+        }
+        if (refLen == altLen) {
+            if (refLen == 1){
+                return SNP;
+            } else {
+                return UNKNOWN;
+            }
+        } else if (refLen > altLen) {
+            return DEL;
+        } else if (refLen < altLen) {
+            return INS;
+        } 
+        return UNKNOWN;
     };
+private:
     GeneAnnotationParam param;
     std::map <std::string, std::vector<Gene> > geneList;
     std::string annotation;
@@ -495,6 +497,7 @@ private:
 };
 int main(int argc, char *argv[])
 {
+    throw fileNotExistException;
 
     BEGIN_PARAMETER_LIST(pl)
         ADD_STRING_PARAMETER(pl, inputFile, "-i", "Specify input VCF file")

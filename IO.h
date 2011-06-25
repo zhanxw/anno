@@ -8,6 +8,14 @@
 
 #include <string>
 #include <vector>
+#include <exception>
+
+class FileNotExistException: public std::exception{
+    virtual const char* what() const throw() {
+        return "File not exist!";
+    }
+};
+static FileNotExistException fileNotExistException;
 
 // #define IO_DEBUG
 
@@ -228,7 +236,7 @@ FileReader* FileReader::open(const char* fileName){
         fr = new Bzip2FileReader(fileName);
         break;
     default:
-        fprintf(stderr, "Cannot detect file type (even not text file?!\n");
+        fprintf(stderr, "Cannot detect file type or file not exist!\n");
         break;
     }
     return fr;
@@ -310,6 +318,7 @@ class BufferedReader: public FileReader{
         if (!this->fp) {
             fprintf(stderr, "Canont open file %s\n", fileName);
             this->fp = NULL;
+            throw fileNotExistException;
         }
     }
     virtual ~BufferedReader(){

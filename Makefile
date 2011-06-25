@@ -8,7 +8,7 @@ release: $(EXEC)
 debug: CXXFLAGS = -g $(DEFAULT_CXXFLAGS)
 debug: $(EXEC)
 
-Main: Main.cpp Gene.h Range.h
+Main: Main.cpp Gene.h Range.h IO.h
 	g++ $(CXXFLAGS) -c Main.cpp -I../statgen/lib/general
 	g++ $(CXXFLAGS) -o Main Main.o ../statgen/lib/libStatGen.a -lz -lbz2 -lssl -lcrypto
 clean:

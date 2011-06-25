@@ -3,8 +3,15 @@ TODO
 7. Support indel
 2. output to VCF format
 3. output statistics
-4. support various input formats (partly done)
+4. support various input formats (partly done on gene file)
 5. customized output
+6. write a log file, parameter, start time, end time, how
+   many gene, how many variant
+
+MIGHT-DO
+========
+1. version checker 
+2. joining sift and polyphen-2.
 
 DONE
 ====
