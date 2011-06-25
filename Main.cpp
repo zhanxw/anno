@@ -48,6 +48,36 @@
 #include "Gene.h"
 #include "GeneFormat.h"
 
+char complementBase(const char c){
+    switch (c){
+    case 'A':
+        return 'T';
+    case 'T':
+        return 'A';
+    case 'G':
+        return 'C';
+    case 'C':
+        return 'G';
+    case 'a':
+        return 't';
+    case 't':
+        return 'a';
+    case 'g':
+        return 'c';
+    case 'c':
+        return 'g';
+    default:
+        return 'N';
+    }
+};
+
+void reverseComplementTriplet(char s[3]){
+    char t = s[0];
+    s[0] = complementBase(s[2]);
+    s[2] = complementBase(t);
+    s[1] = complementBase(s[1]);
+};
+
 class Codon{
 public:
     bool open(const char* codonFile) {
@@ -291,11 +321,27 @@ private:
 #endif
         return;
     };
-    void annotateCodon(const std::string& chr, const int variantPos, const int codonNum, const int codonPos[3], 
-                       const std::string& ref, const std::string& alt,
-                       char refTriplet[3], std::string *refAAName,
-                       char altTriplet[3], std::string *altAAName,
-                       AnnotationType *at) {
+    // void annotateCodon(const std::string& chr, const int variantPos, const int codonNum, const int codonPos[3], 
+    //                    const std::string& ref, const std::string& alt,
+    //                    char refTriplet[3], std::string *refAAName,
+    //                    char altTriplet[3], std::string *altAAName,
+    //                    AnnotationType *at) {
+
+    //     // obtain AA name
+    //     *refAAName = this->codon.toAA(refTriplet);
+    //     *altAAName = this->codon.toAA(altTriplet);
+
+    //     *at = deter(*refAAName, *altAAName, codonNum);
+    //     return ;
+    // };
+    /**
+     * fill the actual base in @param refTriplet and @param altTriplet
+     * we consider @param forwardStrand, so for forward strand, we copy from this->reference, 
+     * or, we copy the reverse complement from this->reference
+     */
+    void fillTriplet(const std::string& chr, const int variantPos, const int codonPos[3], bool forwardStrand,  
+                     const std::string& ref, const std::string& alt, 
+                     char refTriplet[3], char altTriplet[3]) {
         assert(ref.size() == 1 && alt.size() == 1);
         const std::string& seq = this->gs[chr];
         if (codonPos[0] < 0 || codonPos[2] > seq.size()) {
@@ -309,15 +355,12 @@ private:
             altTriplet[1] = (variantPos != codonPos[1]) ? seq[codonPos[1] - 1] : alt[0];
             altTriplet[2] = (variantPos != codonPos[2]) ? seq[codonPos[2] - 1] : alt[0];
         }
-
-        // obtain AA name
-        *refAAName = this->codon.toAA(refTriplet);
-        *altAAName = this->codon.toAA(altTriplet);
-
-        *at = calculateCodonMutationType(*refAAName, *altAAName, codonNum);
-        return ;
+        if (!forwardStrand) {
+            reverseComplementTriplet(refTriplet);
+            reverseComplementTriplet(altTriplet);
+        }
     };
-    AnnotationType calculateCodonMutationType(const std::string& refAAName, const std::string& altAAName, const int codonNum){
+    AnnotationType determineSNVType(const std::string& refAAName, const std::string& altAAName, const int codonNum){
         if (refAAName == Codon::unknownAA || altAAName == Codon::unknownAA) {
             return SNV;
         } else if (refAAName == "Stp" && altAAName != "Stp") {
@@ -371,24 +414,30 @@ private:
                         AnnotationType annotationType;
                         // when reference genome is provided
                         if (this->gs.size() >0){
-                        this->annotateCodon(chr, variantPos, codonNum, codonPos, ref, alt,
-                                            refTriplet, &refAAName,
-                                            altTriplet, &altAAName,
-                                            &annotationType);
-                        std::string s;
-                        s = AnnotationString[annotationType];
-                        s += refTriplet[0];
-                        s += refTriplet[1];
-                        s += refTriplet[2];
-                        s += ":";
-                        s += refAAName;
-                        s += "->";
-                        s += altTriplet[0];
-                        s += altTriplet[1];
-                        s += altTriplet[2];
-                        s += ":";
-                        s += altAAName;
-                        annotation.push_back(s);
+                            // this->annotateCodon(chr, variantPos, codonNum, codonPos, ref, alt,
+                            //                     refTriplet, &refAAName,
+                            //                     altTriplet, &altAAName,
+                            //                     &annotationType);
+                            this->fillTriplet(chr, variantPos, codonPos, g.forwardStrand, ref, alt, refTriplet, altTriplet);
+
+                            refAAName = this->codon.toAA(refTriplet);
+                            altAAName = this->codon.toAA(altTriplet);
+                            annotationType = this->determineSNVType(refAAName, altAAName, codonNum);
+
+                            std::string s;
+                            s = AnnotationString[annotationType];
+                            s += refTriplet[0];
+                            s += refTriplet[1];
+                            s += refTriplet[2];
+                            s += ":";
+                            s += refAAName;
+                            s += "->";
+                            s += altTriplet[0];
+                            s += altTriplet[1];
+                            s += altTriplet[2];
+                            s += ":";
+                            s += altAAName;
+                            annotation.push_back(s);
                         } else {
                             annotation.push_back(AnnotationString[SNV]);
                         }
