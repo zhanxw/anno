@@ -114,6 +114,10 @@ public:
     static std::string unknownLetter;
     static std::string unknownFullName;
 private:
+    /**
+     * @return if the key exists, return data[key]
+     * or @return @param defaultValue
+     */
     const std::string& safeAccess( const std::map<std::string, std::string>& data, 
                                    const std::string& key,
                                    const std::string& defaultValue) const {
@@ -497,8 +501,6 @@ private:
 };
 int main(int argc, char *argv[])
 {
-    throw fileNotExistException;
-
     BEGIN_PARAMETER_LIST(pl)
         ADD_STRING_PARAMETER(pl, inputFile, "-i", "Specify input VCF file")
         ADD_STRING_PARAMETER(pl, geneFile, "-g", "Specify gene file")
