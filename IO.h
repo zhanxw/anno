@@ -11,11 +11,15 @@
 #include <exception>
 
 class FileNotExistException: public std::exception{
-    virtual const char* what() const throw() {
-        return "File not exist!";
+  public:
+    FileNotExistException(const char* fileName){
+        this->fileName = fileName;
     }
+    virtual const char* what() const throw() {
+        return this->fileName;
+    }
+    const char* fileName;
 };
-static FileNotExistException fileNotExistException;
 
 // #define IO_DEBUG
 
@@ -318,7 +322,7 @@ class BufferedReader: public FileReader{
         if (!this->fp) {
             fprintf(stderr, "Canont open file %s\n", fileName);
             this->fp = NULL;
-            throw fileNotExistException;
+            throw FileNotExistException(fileName);
         }
     }
     virtual ~BufferedReader(){

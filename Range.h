@@ -4,6 +4,16 @@
 // all are 1-based index, inclusive on boundaries.
 // NOTE: UCSC use 0-based start and 1-based end, this is convenient to calculate length
 //       but for complex case, this causes confusion.
+/**
+ * Example, 1-index range 3-4, inclusive on the boundary
+ * in UCSC setting, this range is coded as 2-4 (see below)
+ *             @
+ * 0-base: 0 1 2 3 4 5 
+ * 1-base: 1 2 3 4 5 6
+ *               ^
+ * the tricky thing is 0-length range, in such case,
+ * the UCSC coded the start and end as the same value
+ */
 struct Range{
     int start;
     int end;

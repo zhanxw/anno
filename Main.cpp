@@ -22,16 +22,6 @@
  *    freq of indel length     .indel.freq
  */
 
-/**
- * Example, 1-index range 3-4, inclusive on the boundary
- * in UCSC setting, this range is coded as 2-4 (see below)
- *             @
- * 0-base: 0 1 2 3 4 5 
- * 1-base: 1 2 3 4 5 6
- *               ^
- * the tricky thing is 0-length range, in such case,
- * the UCSC coded the start and end as the same value
- */
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -110,6 +100,11 @@ public:
         return safeAccess(this->codon2aa, key, Codon::unknownAA);
     };
 public:
+    static bool isStopCodon(const std::string& a) {
+        if (a == "Stp") return true;
+        return false;
+    };
+public:
     static std::string unknownAA;
     static std::string unknownLetter;
     static std::string unknownFullName;
@@ -145,7 +140,7 @@ public:
     bool open(const char* fileName){
         LineReader lr(fileName);
         std::string line;
-        std::string chr = "NoName";
+        std::string chr = "";
         while(lr.readLine(&line) > 0) {
             if (line.size() > 0) {
                 if (line[0] == '>') {
@@ -155,14 +150,29 @@ public:
                     this->data[chr] = "";
                 } else {
                     stringStrip(&line);
-                    this->data[chr] += line;
+                    if (this->data.find(chr) != this->data.end())
+                        this->data[chr] += line;
                 }
             }
         }
         return true;
     };
+    /**
+     * @return total number of chromosome
+     */
     int size() const {
         return this->data.size();
+    };
+    /**
+     * @return total number of chromosome
+     */
+    int getGenomeLength() const {
+        int l = 0;
+        std::map<std::string, std::string>::const_iterator it;
+        for (it = this->data.begin(); it != this->data.end() ; it++) {
+            l += (it->second).size();
+        }
+        return l;
     };
     std::string& getChromosome(const char* c){
         return this->data[c];
@@ -186,7 +196,7 @@ typedef enum {
     UTR3,
     INTRON,
     EXON,
-    SNV,                    /*SNV contain the following 6 types, it appears when there is no reference.*/
+    SNV,                    /*SNV contains the following 6 types, it appears when there is no reference.*/
     SYNONYMOUS,
     NONSYNONYMOUS,
     STOP_GAIN,
@@ -236,6 +246,7 @@ struct GeneAnnotationParam{
 
 class GeneAnnotation{
 public:
+    GeneAnnotation():allowMixedVariation(false){};
     void setFormat(const std::string& f) {
         if (f == "refFlat") {
             this->format.setRefFlatFormat();
@@ -245,7 +256,6 @@ public:
             fprintf(stderr, "Unknown format!\nNow quitting...\n");
         }
     };
-
     void openGeneFile(const char* geneFileName){
         std::string line;
         std::vector<std::string> fields;
@@ -270,12 +280,21 @@ public:
     };
     // we take a VCF input file for now
     void annotate(const char* inputFileName, const char* outputFileName){
+        // open output file
+        FILE* fout = fopen(outputFileName, "wt");
+        assert(fout);
+        
+        // open input file
         std::string annotationString;
         LineReader lr(inputFileName);
         std::vector<std::string> field;
         std::string line;
         while(lr.readLine(&line) > 0) {
-            if (line.size() == 0 || line[0] == '#') continue;
+            if (line.size() == 0 || line[0] == '#') {
+                fputs(line.c_str(), fout);
+                fputc('\n', fout);
+                continue;
+            }
             stringTokenize(line, "\t", &field);
             if (field.size() < 4) continue;
             std::string chr = field[0];
@@ -286,14 +305,36 @@ public:
             this->findInRangeGene(field[0], &pos, &potentialGeneIdx);
             if (potentialGeneIdx.size() == 0) continue;
             annotationString.clear();
+
             for (unsigned int i = 0; i < potentialGeneIdx.size(); i++) {
                 this->annotateByGene(potentialGeneIdx[i], chr, pos, ref, alt, &annotationString);
-                printf("%s %d ref=%s alt=%s has annotation: %s\n",
-                       chr.c_str(), pos, 
-                       ref.c_str(), alt.c_str(),
-                       annotationString.c_str());
+                // printf("%s %d ref=%s alt=%s has annotation: %s\n",
+                //        chr.c_str(), pos, 
+                //        ref.c_str(), alt.c_str(),
+                //        annotationString.c_str());
             }
+
+            // output annotation result
+            // VCF info field is the 8th column
+            for (unsigned int i = 0; i < field.size(); i++ ){
+                if (i) fputc('\t', fout);
+                fputs(field[i].c_str(), fout) ;
+                if (i == 7) { // 7: the 8th column in 0-based index
+                    if (annotationString.size() == 0) {
+                        //intergenic
+                        fputs(";ANNO=", fout);
+                        fputs(AnnotationString[INTROGENIC], fout);
+                    } else {
+                        fputs(";ANNO=", fout);
+                        fputs(annotationString.c_str(), fout);
+                    }
+                }
+            }
+            fputc('\n', fout);
         }
+        // close output
+        fclose(fout);
+
         return;
     };
     void setAnnotationParameter(GeneAnnotationParam& param) {
@@ -369,9 +410,9 @@ private:
     AnnotationType determineSNVType(const std::string& refAAName, const std::string& altAAName, const int codonNum){
         if (refAAName == Codon::unknownAA || altAAName == Codon::unknownAA) {
             return SNV;
-        } else if (refAAName == "Stp" && altAAName != "Stp") {
+        } else if (Codon::isStopCodon(refAAName) && !Codon::isStopCodon(altAAName)) {
             return STOP_LOSS;
-        } else if (refAAName != "Stp" && altAAName == "Stp") {
+        } else if (!Codon::isStopCodon(refAAName) && Codon::isStopCodon(altAAName)) {
             return STOP_GAIN;
         } else if (refAAName == "Met" && altAAName != "Met" && codonNum <= 3) {
             return START_LOSS;
@@ -383,10 +424,12 @@ private:
             return NONSYNONYMOUS;
         }
     };
-    void annotateByGene(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
-                        std::string* annotationString){
+    void annotateSNP(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
+                     std::string* annotationString) {
         Gene& g = this->geneList[chr][geneIdx];
         std::vector<std::string> annotation;
+
+        // might useful vars.
         int dist2Gene;
         int utrPos, utrLen;
         int exonNum; // which exon
@@ -395,8 +438,9 @@ private:
         AnnotationType type; // could be one of 
         int intronNum; // which intron
         bool isEssentialSpliceSite;
+
         if (g.isUpstream(variantPos, param.upstreamRange, &dist2Gene)) {
-            annotation.push_back(AnnotationString[DOWNSTREAM]);
+            annotation.push_back(AnnotationString[UPSTREAM]);
         } else if (g.isDownstream(variantPos, param.upstreamRange, &dist2Gene)) {
             annotation.push_back(AnnotationString[DOWNSTREAM]);
         } else if (g.isExon(variantPos, &exonNum)){//, &codonNum, codonPos)) {
@@ -423,6 +467,7 @@ private:
 
                             std::string s;
                             s = AnnotationString[annotationType];
+                            s += '(';
                             s += refTriplet[0];
                             s += refTriplet[1];
                             s += refTriplet[2];
@@ -434,6 +479,7 @@ private:
                             s += altTriplet[2];
                             s += ":";
                             s += altAAName;
+                            s += ')';
                             annotation.push_back(s);
                         } else {
                             annotation.push_back(AnnotationString[SNV]);
@@ -462,19 +508,48 @@ private:
         } else {
             //annotation.push_back("Intergenic");
         }
-        *annotationString = g.name;
-        annotationString->push_back(':');
-        *annotationString+=(stringJoin(annotation, ":"));
+        *annotationString += g.name;
+        *annotationString += g.forwardStrand ? "(+)" : "(-)"; 
+        annotationString->push_back('|');
+        *annotationString+=(stringJoin(annotation, "|"));
+    }
+    /**
+     * 
+     */
+    void annotateByGene(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
+                        std::string* annotationString){
+        // check VARATION_TYPE
+        switch(determineVariationType(ref, alt)) {
+        case SNP:
+            this->annotateSNP(geneIdx, chr, variantPos, ref, alt, annotationString);
+            break;
+        case INS:
+            break;
+        case DEL:
+            break;
+        case MIXED:
+            if (this->allowMixedVariation) {
+                // annotate multiple gene
+            } else {
+                // only annotate the first variation
+            };
+            break;
+        case SV:
+            break;
+        case UNKNOWN:
+        default:
+            break;
+        };
         return;
     };
     /**
      * @return the variation type depending on the first entry in the alt field
      */
-    VARIATION_TYPE determineMutationType(const std::string& ref, const std::string& alt) {
+    VARIATION_TYPE determineVariationType(const std::string& ref, const std::string& alt) {
         const char* BASE = "ACGT";
         unsigned int refLen = ref.size();
         unsigned int altLen = alt.size();
-        if (alt.find_first_not_of(BASE) != std::string::npos) { 
+        if (alt.find_first_not_of(BASE) != std::string::npos) {
             //contain 
             return SV;
         }
@@ -498,26 +573,32 @@ private:
     GenomeSequence gs;
     Codon codon;
     GeneFormat format;
+    bool allowMixedVariation; // ALT may has more than one variation e..g A,C
 };
 int main(int argc, char *argv[])
 {
     BEGIN_PARAMETER_LIST(pl)
         ADD_STRING_PARAMETER(pl, inputFile, "-i", "Specify input VCF file")
+        ADD_STRING_PARAMETER(pl, outputFile, "-o", "Specify output VCF file")
         ADD_STRING_PARAMETER(pl, geneFile, "-g", "Specify gene file")
         ADD_STRING_PARAMETER(pl, referenceFile, "-r", "Specify reference genome position")
         ADD_STRING_PARAMETER(pl, geneFileFormat, "-f", "Specify gene file format (default: refFlat, other options knownGene)")
-    END_PARAMETER_LIST(pl)
+        END_PARAMETER_LIST(pl)
         ;
     
     pl.Read(argc, argv);
     if (FLAG_geneFileFormat.size() == 0) {
         FLAG_geneFileFormat = "refFlat";
     }        
-#if 1
-    GeneAnnotation ga;
+
     if (FLAG_inputFile.size() == 0) {
         pl.Help();
         fprintf(stderr, "Please specify input file\n");
+        exit(1);
+    }
+    if (FLAG_outputFile.size() == 0) {
+        pl.Help();
+        fprintf(stderr, "Please specify output file\n");
         exit(1);
     }
     if (FLAG_geneFile.size() == 0) {
@@ -526,6 +607,8 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+#if 1
+    GeneAnnotation ga;
     pl.Status();
     if (FLAG_referenceFile.size() != 0) {
         ga.openReferenceGenome(FLAG_referenceFile.c_str());
@@ -534,8 +617,9 @@ int main(int argc, char *argv[])
 
     ga.setFormat(FLAG_geneFileFormat);
     ga.openGeneFile(FLAG_geneFile.c_str());
-    ga.annotate(FLAG_inputFile.c_str(), "test.output.vcf");
+    ga.annotate(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
 #else
+    // debug purpose
     GeneAnnotation ga;
     ga.setFormat(FLAG_geneFileFormat);
     ga.openGeneFile("test.gene.txt");
