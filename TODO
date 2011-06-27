@@ -10,6 +10,7 @@ MIGHT-DO
 ========
 1. vcfVersion checker 
 2. joining sift and polyphen-2.
+3. output format are configurable (user specify).
 
 DONE
 ====
@@ -18,3 +19,10 @@ DONE
 6. Triplet -> AA consider reverse strand
 7. Support indel
 2. output to VCF format
+* 3. output basis statisitcs:
+ *    freq of each annotation  .anno.freq
+ *    freq of each base change .base.freq
+ *    freq of codon change     .codon.freq
+ *    freq of indel length     .indel.freq
+ */
+

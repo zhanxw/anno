@@ -1,14 +1,3 @@
-/**
- * Main feature list
- * 3. output format are configurable.
- *    user specify
- * 4. output basis statisitcs:
- *    freq of each annotation  .anno.freq
- *    freq of each base change .base.freq
- *    freq of codon change     .codon.freq
- *    freq of indel length     .indel.freq
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -141,25 +130,33 @@ public:
         }
     };
     void openGeneFile(const char* geneFileName){
+        fprintf(stdout, "Load gene file %s...\n", geneFileName);
         std::string line;
         std::vector<std::string> fields;
         LineReader lr(geneFileName);
+        int totalGene = 0;
         while (lr.readLine(&line) > 0) {
             stringStrip(&line);
             if (line.size()>0 && line[0] == '#' || line.size() == 0) continue; // skip headers and empty lines
             Gene g;
             g.readLine(line.c_str(), this->format);
             this->geneList[g.chr].push_back(g);
+            totalGene ++;
         }
         // make sure genes are ordered
         this->sortGene();
+        fprintf(stdout, "DONE: %d gene loaded.\n", totalGene);
+        LOG << "Gene file " << geneFileName << " loads succeed!\n";
         return;
     };
     void openCodonFile(const char* codonFileName) {
         this->codon.open(codonFileName);
     };
     void openReferenceGenome(const char* referenceGenomeFileName) {
+        fprintf(stdout, "Load reference genome %s...\n", referenceGenomeFileName);
         this->gs.open(referenceGenomeFileName);
+        fprintf(stdout, "DONE: %d chromosomes and %d bases are loaded.\n", this->gs.size(), this->gs.getGenomeLength());
+        LOG << "Reference genome file " << referenceGenomeFileName << " loads succeed!\n";
         return;
     };
     // we take a VCF input file for now
@@ -174,6 +171,7 @@ public:
         LineReader lr(inputFileName);
         std::vector<std::string> field;
         std::string line;
+        int totalVariants = 0;
         while(lr.readLine(&line) > 0) {
             if (line.size() == 0 || line[0] == '#') {
                 fputs(line.c_str(), fout);
@@ -182,6 +180,7 @@ public:
             }
             stringTokenize(line, "\t", &field);
             if (field.size() < 4) continue;
+            totalVariants++;
             std::string chr = field[0];
             int pos = toInt(field[1]);
             std::string ref = toUpper(field[3]);
@@ -223,6 +222,8 @@ public:
         }
         // close output
         fclose(fout);
+        fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
+        LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
 
         return;
     };
@@ -759,7 +760,8 @@ int main(int argc, char *argv[])
     }
 
 #if 1
-    LOG_START("test.log");
+    std::string logFileName = FLAG_outputFile + ".log";
+    LOG_START(logFileName.c_str());
     LOG_START_TIME;
     LOG_PARAMETER(pl);
     GeneAnnotation ga;
