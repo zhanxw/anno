@@ -120,7 +120,20 @@ public:
         this->data.clear();
     };
     std::string toString(){
+        // *annotationString += g.name;
+        // *annotationString += g.forwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING;
+        // annotationString->push_back(WITHIN_GENE_SEPARATOR);
+        // *annotationString+=(stringJoin(annotation, WITHIN_GENE_SEPARATOR));
+
         return stringJoin(this->data, GENE_SEPARATOR);
+    };
+    void add(const Gene& g){
+        if (this->data.size() != 0) {
+            // we usually record gene name and its strand first
+            fprintf(stderr, "Something weired happen\n");
+        }
+        this->data.push_back(g.name);
+        this->data.push_back(g.forwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING);
     };
     void add(const AnnotationType& t) {
         this->data.push_back(AnnotationString[t]);
@@ -132,6 +145,9 @@ public:
         unsigned int n = this->data.size();
         assert( n > 0);
         this->data[n-1] += s;
+    };
+    FreqTable<AnnotationType>& getFreq() {
+        return this->freq;
     };
 private:
     std::vector<std::string> data;
@@ -256,11 +272,19 @@ public:
         fclose(fout);
         fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
         LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
-
         return;
     };
     void setAnnotationParameter(GeneAnnotationParam& param) {
         this->param = param;
+    };
+    void printAnnotationFrequency(){
+        unsigned int n = this->geneAnnotation.getFreq().size();
+        for (unsigned int i = 0; i < n; i++){
+            AnnotationType t;
+            int count;
+            this->geneAnnotation.getFreq().at(i, &t, &count);
+            fprintf(stdout, "%s: %d\n", AnnotationString[t], count);
+        }
     };
 private:
     // make sure genes are ordered
@@ -350,10 +374,9 @@ private:
      * To annotate for insertion is very similar to annotate SNP, and the only difference is that
      * insertion in the exon could cause frameshift/codon_insertion/codon_deletion
      */
-    void annotateIns(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
-                     std::string* annotationString) {
+    void annotateIns(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt) {
         Gene& g = this->geneList[chr][geneIdx];
-        std::vector<std::string> annotation;
+        this->geneAnnotation.add(g);
 
         // might useful vars.
         int dist2Gene;
@@ -365,23 +388,23 @@ private:
         int intronNum; // which intron
         bool isEssentialSpliceSite;
 
-        annotation.push_back(AnnotationString[INSERTION]);
+        this->geneAnnotation.add(INSERTION);
         if (g.isUpstream(variantPos, param.upstreamRange, &dist2Gene)) {
-            annotation.push_back(AnnotationString[UPSTREAM]);
+            this->geneAnnotation.add(UPSTREAM);
         } else if (g.isDownstream(variantPos, param.upstreamRange, &dist2Gene)) {
-            annotation.push_back(AnnotationString[DOWNSTREAM]);
+            this->geneAnnotation.add(DOWNSTREAM);
         } else if (g.isExon(variantPos, &exonNum)){//, &codonNum, codonPos)) {
-            annotation.push_back(AnnotationString[EXON]);
+            this->geneAnnotation.add(EXON);
             if (!g.isNonCoding()) {
                 if (g.is5PrimeUtr(variantPos, &utrPos, &utrLen)) {
-                    annotation.push_back(AnnotationString[UTR5]);
+                    this->geneAnnotation.add(UTR5);
                 } else if (g.is3PrimeUtr(variantPos, &utrPos, &utrLen)) {
-                    annotation.push_back(AnnotationString[UTR3]);
+                    this->geneAnnotation.add(UTR3);
                 } else { // cds part has base change
                     int insertSize = alt.size() - ref.size();
                     if (insertSize % 3 == 0) {
+                        this->geneAnnotation.add(CODON_GAIN);
                         std::string s;
-                        s = AnnotationString[CODON_GAIN];
                         char triplet[3];
                         std::string aaName;
                         s+= WITHIN_GENE_LEFT_DELIM;
@@ -395,45 +418,40 @@ private:
                             s+= aaName;
                         }
                         s+= WITHIN_GENE_RIGHT_DELIM;
-                        annotation.push_back(s);
+                        this->geneAnnotation.addDetail(s);
                     } else {
-                        annotation.push_back(AnnotationString[FRAME_SHIFT]);
+                        this->geneAnnotation.add(FRAME_SHIFT);
                     }
                 }
             } else {
-                annotation.push_back(AnnotationString[NONCODING]);
+                this->geneAnnotation.add(NONCODING);
             }
             // check splice site
             if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
                 if (isEssentialSpliceSite)
-                    annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
+                    this->geneAnnotation.add(ESSENTIAL_SPLICE_SITE);
                 else
-                    annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
+                    this->geneAnnotation.add(NORMAL_SPLICE_SITE);
             }
         } else if (g.isIntron(variantPos, &intronNum)) {
-            annotation.push_back(AnnotationString[INTRON]);
+            this->geneAnnotation.add(INTRON);
             // check splice site
             if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
                 if (isEssentialSpliceSite)
-                    annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
+                    this->geneAnnotation.add(ESSENTIAL_SPLICE_SITE);
                 else
-                    annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
+                    this->geneAnnotation.add(NORMAL_SPLICE_SITE);
             }
         } else {
             //annotation.push_back("Intergenic");
         }
-        *annotationString += g.name;
-        *annotationString += g.forwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING;
-        annotationString->push_back(WITHIN_GENE_SEPARATOR);
-        *annotationString+=(stringJoin(annotation, WITHIN_GENE_SEPARATOR));
     } // end annotateIns(...)
     /**
      * Deletion may across various regions
      * we use std::set to store all regions it came across
      *
      */
-    void annotateDel(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
-                     std::string* annotationString) {
+    void annotateDel(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt) {
         Gene& g = this->geneList[chr][geneIdx];
         std::set<AnnotationType> annotationSet;
 
@@ -511,26 +529,20 @@ private:
             }
         }
         // store all existing annotation
-        std::vector<std::string> annotation;
+        this->geneAnnotation.add(g);
         for (std::set<AnnotationType>::const_iterator it = annotationSet.begin();
              it != annotationSet.end();
              it++) {
-            annotation.push_back(AnnotationString[*it]);
+            this->geneAnnotation.add(*it);
         };
-
-        *annotationString += g.name;
-        *annotationString += g.forwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING;
-        annotationString->push_back(WITHIN_GENE_SEPARATOR);
-        *annotationString+=(stringJoin(annotation, WITHIN_GENE_SEPARATOR));
     };
     /**
      * SV is the most complex scenario. fully support this is an ongoing work.
      * We will just annotation the region in the rough scale.
      */
-    void annotateSV(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
-                    std::string* annotationString) {
+    void annotateSV(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt) {
         Gene& g = this->geneList[chr][geneIdx];
-        std::vector<std::string> annotation;
+        this->geneAnnotation.add(g);
 
         // might useful vars.
         int dist2Gene;
@@ -541,53 +553,47 @@ private:
         AnnotationType type; // could be one of
         int intronNum; // which intron
         bool isEssentialSpliceSite;
-        annotation.push_back(AnnotationString[STRUCTURE_VARIATION]);
+        this->geneAnnotation.add(STRUCTURE_VARIATION);
         if (g.isUpstream(variantPos, param.upstreamRange, &dist2Gene)) {
-            annotation.push_back(AnnotationString[UPSTREAM]);
+            this->geneAnnotation.add(UPSTREAM);
         } else if (g.isDownstream(variantPos, param.upstreamRange, &dist2Gene)) {
-            annotation.push_back(AnnotationString[DOWNSTREAM]);
+            this->geneAnnotation.add(DOWNSTREAM);
         } else if (g.isExon(variantPos, &exonNum)){//, &codonNum, codonPos)) {
-            annotation.push_back(AnnotationString[EXON]);
+            this->geneAnnotation.add(EXON);
             if (!g.isNonCoding()) {
                 if (g.is5PrimeUtr(variantPos, &utrPos, &utrLen)) {
-                    annotation.push_back(AnnotationString[UTR5]);
+                    this->geneAnnotation.add(UTR5);
                 } else if (g.is3PrimeUtr(variantPos, &utrPos, &utrLen)) {
-                    annotation.push_back(AnnotationString[UTR3]);
+                    this->geneAnnotation.add(UTR3);
                 } else { // cds part has base change
-                    annotation.push_back(AnnotationString[CODON_REGION]);
+                    this->geneAnnotation.add(CODON_REGION);
                 }
             } else{
-                annotation.push_back(AnnotationString[NONCODING]);
+                this->geneAnnotation.add(NONCODING);
             }
             // check splice site
             if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
                 if (isEssentialSpliceSite)
-                    annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
+                    this->geneAnnotation.add(ESSENTIAL_SPLICE_SITE);
                 else
-                    annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
+                    this->geneAnnotation.add(NORMAL_SPLICE_SITE);
             }
         } else if (g.isIntron(variantPos, &intronNum)) {
-            annotation.push_back(AnnotationString[INTRON]);
+            this->geneAnnotation.add(INTRON);
             // check splice site
             if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
                 if (isEssentialSpliceSite)
-                    annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
+                    this->geneAnnotation.add(ESSENTIAL_SPLICE_SITE);
                 else
-                    annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
+                    this->geneAnnotation.add(NORMAL_SPLICE_SITE);
             }
         } else {
             //annotation.push_back("Intergenic");
         }
-        *annotationString += g.name;
-        *annotationString += g.forwardStrand ? "(+)" : "(-)";
-        annotationString->push_back('|');
-        *annotationString+=(stringJoin(annotation, "|"));
-
     }
-    void annotateSNP(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
-                     std::string* annotationString) {
+    void annotateSNP(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt) {
         Gene& g = this->geneList[chr][geneIdx];
-        std::vector<std::string> annotation;
+        this->geneAnnotation.add(g);
 
         // might useful vars.
         int dist2Gene;
@@ -600,16 +606,16 @@ private:
         bool isEssentialSpliceSite;
 
         if (g.isUpstream(variantPos, param.upstreamRange, &dist2Gene)) {
-            annotation.push_back(AnnotationString[UPSTREAM]);
+            this->geneAnnotation.add(UPSTREAM);
         } else if (g.isDownstream(variantPos, param.upstreamRange, &dist2Gene)) {
-            annotation.push_back(AnnotationString[DOWNSTREAM]);
+            this->geneAnnotation.add(DOWNSTREAM);
         } else if (g.isExon(variantPos, &exonNum)){//, &codonNum, codonPos)) {
-            annotation.push_back(AnnotationString[EXON]);
+            this->geneAnnotation.add(EXON);
             if (!g.isNonCoding()) {
                 if (g.is5PrimeUtr(variantPos, &utrPos, &utrLen)) {
-                    annotation.push_back(AnnotationString[UTR5]);
+                    this->geneAnnotation.add(UTR5);
                 } else if (g.is3PrimeUtr(variantPos, &utrPos, &utrLen)) {
-                    annotation.push_back(AnnotationString[UTR3]);
+                    this->geneAnnotation.add(UTR3);
                 } else { // cds part has base change
                     if (g.calculateCodonPosition(variantPos, &codonNum, codonPos)) {
                         char refTriplet[3];
@@ -625,8 +631,8 @@ private:
                             altAAName = this->codon.toAA(altTriplet);
                             annotationType = this->determineSNVType(refAAName, altAAName, codonNum);
 
+                            this->geneAnnotation.add(annotationType);
                             std::string s;
-                            s = AnnotationString[annotationType];
                             s += WITHIN_GENE_LEFT_DELIM;
                             s += refTriplet[0];
                             s += refTriplet[1];
@@ -640,40 +646,36 @@ private:
                             s += "/";
                             s += altAAName;
                             s += WITHIN_GENE_RIGHT_DELIM;
-                            annotation.push_back(s);
+                            this->geneAnnotation.addDetail(s);
                         } else {
-                            annotation.push_back(AnnotationString[SNV]);
+                            this->geneAnnotation.add(SNV);
                         }
                     } else {
-                        annotation.push_back(AnnotationString[SNV]);
+                        this->geneAnnotation.add(SNV);
                     }
                 }
             } else{
-                annotation.push_back(AnnotationString[NONCODING]);
+                this->geneAnnotation.add(NONCODING);
             }
             // check splice site
             if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
                 if (isEssentialSpliceSite)
-                    annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
+                    this->geneAnnotation.add(ESSENTIAL_SPLICE_SITE);
                 else
-                    annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
+                    this->geneAnnotation.add(NORMAL_SPLICE_SITE);
             }
         } else if (g.isIntron(variantPos, &intronNum)) {
-            annotation.push_back(AnnotationString[INTRON]);
+            this->geneAnnotation.add(INTRON);
             // check splice site
             if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
                 if (isEssentialSpliceSite)
-                    annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
+                    this->geneAnnotation.add(ESSENTIAL_SPLICE_SITE);
                 else
-                    annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
+                    this->geneAnnotation.add(NORMAL_SPLICE_SITE);
             }
         } else {
             //annotation.push_back("Intergenic");
         }
-        *annotationString += g.name;
-        *annotationString += g.forwardStrand ? "(+)" : "(-)";
-        annotationString->push_back('|');
-        *annotationString+=(stringJoin(annotation, "|"));
     }
     /**
      *
@@ -682,16 +684,17 @@ private:
                         std::string* annotationString){
         assert(annotationString);
         annotationString->clear();
+        this->geneAnnotation.clear();
         // check VARATION_TYPE
         switch(determineVariationType(ref, alt)) {
         case SNP:
-            this->annotateSNP(geneIdx, chr, variantPos, ref, alt, annotationString);
+            this->annotateSNP(geneIdx, chr, variantPos, ref, alt);
             break;
         case INS:
-            this->annotateIns(geneIdx, chr, variantPos, ref, alt, annotationString);
+            this->annotateIns(geneIdx, chr, variantPos, ref, alt);
             break;
         case DEL:
-            this->annotateDel(geneIdx, chr, variantPos, ref, alt, annotationString);
+            this->annotateDel(geneIdx, chr, variantPos, ref, alt);
             break;
         case MIXED:
             if (this->allowMixedVariation) {
@@ -706,12 +709,14 @@ private:
             };
             break;
         case SV:
-            this->annotateSV(geneIdx, chr, variantPos, ref, alt, annotationString);
+            this->annotateSV(geneIdx, chr, variantPos, ref, alt);
             break;
         case UNKNOWN:
         default:
             break;
         };
+
+        annotationString->assign(this->geneAnnotation.toString());
         return;
     };
     /**
@@ -813,6 +818,7 @@ int main(int argc, char *argv[])
     ga.setFormat(FLAG_geneFileFormat);
     ga.openGeneFile(FLAG_geneFile.c_str());
     ga.annotate(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
+    ga.printAnnotationFrequency();
 
     LOG_END_TIME;
     LOG_END ;
