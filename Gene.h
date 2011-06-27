@@ -190,7 +190,15 @@ class Gene{
                 return true;
         }
         return false;
-    }
+    };
+    bool isCodingRegion(const int variantPos, int* codonNum){
+        if (isNonCoding())
+            return false;
+        if (this->isInRange(variantPos, this->cds)){
+            return true;
+        }
+        return false;
+    };
     int nextCodonPos(const int currentPos, int* cdsIdx, const int offset) {
         assert (offset == 1 || offset == -1);
         int nextPos = -1;
@@ -210,7 +218,7 @@ class Gene{
                 if (*cdsIdx < 0) {
                     return -1;
                 }
-                nextPos = this->cds[*cdsIdx].start;
+                nextPos = this->cds[*cdsIdx].end;
             } 
         }            
         return nextPos;

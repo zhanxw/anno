@@ -1,7 +1,5 @@
 TODO
 ====
-7. Support indel
-2. output to VCF format
 3. output statistics
 4. support various input formats (partly done on gene file)
 5. customized output
@@ -18,3 +16,5 @@ DONE
 1. improve performance of     void findInRangeGene(int*
    start, int* end, const std::string& chr, int* pos) {
 6. Triplet -> AA consider reverse strand
+7. Support indel
+2. output to VCF format

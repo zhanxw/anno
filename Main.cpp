@@ -1,18 +1,5 @@
 /**
  * Main feature list
- * 1. support various annotion
- *    UPSTREAM / DOWNSTREAM 
- *    5PRIME_UTR / 3PRIME_UTR
- *    INTRON
- *    SYNONYMOUS / NONSYNONYMOUS
- *    STOP_GAIN / STOP_LOST
- *    START_GAIN / START_LOST ??
- *    SPLICE_SITE
- *    INTROGENETIC
- *    CODON_DELETION / CODON_INSERTION / FRAME_SHIFT
- *    
- * 2. input format are flexible
- *    support VCF, as well as user specified.
  * 3. output format are configurable.
  *    user specify
  * 4. output basis statisitcs:
@@ -28,6 +15,7 @@
 
 #include <string>
 #include <vector>
+#include <set>
 #include <map>
 #include <algorithm>
 
@@ -52,7 +40,10 @@ typedef enum {
 } VARIATION_TYPE;
 
 typedef enum {
-    UPSTREAM = 0,
+    INSERTION = 0,
+    DELETION,
+    STRUCTURE_VARIATION,
+    UPSTREAM,
     DOWNSTREAM,
     UTR5,
     UTR3,
@@ -70,11 +61,15 @@ typedef enum {
     FRAME_SHIFT,            /* Indel length is not divisible by 3 */
     CODON_GAIN,             /* Insertion length is divisible by 3 */
     CODON_LOSS,             /* Deletion length is divisible by 3 */
+    CODON_REGION,           /* Just say the variant is in the Coding Region, used in Structrual Varition*/
     INTROGENIC,
     NONCODING
 } AnnotationType;
 
 const char* AnnotationString[]= {
+    "Insertion",
+    "Deletion",
+    "StructuralVariation",
     "Upstream", 
     "Downstream",
     "Utr5",
@@ -93,6 +88,7 @@ const char* AnnotationString[]= {
     "Frameshift",
     "CodonGain",
     "CodonLoss",
+    "CodonRegion",
     "Introgenic",
     "Noncoding"
 };
@@ -111,7 +107,8 @@ struct GeneAnnotationParam{
 // here we define format or the annotation.
 #define FORWARD_STRAND_STRING "(+)"
 #define REVERSE_STRAND_STRING "(-)"
-#define ANNOTATION_START_TAG ";ANNO="
+#define INFO_SEPARATOR ';'
+#define ANNOTATION_START_TAG "ANNO="
 #define GENE_SEPARATOR ':'
 #define WITHIN_GENE_SEPARATOR '|'
 #define WITHIN_GENE_LEFT_DELIM '('
@@ -177,7 +174,7 @@ public:
             std::string alt = toUpper(field[4]);
             std::vector<unsigned> potentialGeneIdx;
             this->findInRangeGene(field[0], &pos, &potentialGeneIdx);
-            if (potentialGeneIdx.size() == 0) continue;
+            // if Introgenic,  we will have (potentialGeneIdx.size() == 0) 
             annotationString.clear();
             geneAnnotation.clear();
             for (unsigned int i = 0; i < potentialGeneIdx.size(); i++) {
@@ -195,6 +192,9 @@ public:
                 if (i) fputc('\t', fout);
                 fputs(field[i].c_str(), fout) ;
                 if (i == 7) { // 7: the 8th column in 0-based index
+                    if (field[i].size() != 0) {
+                        fputc(INFO_SEPARATOR, fout);
+                    }
                     if (annotationString.size() == 0) {
                         //intergenic
                         fputs(ANNOTATION_START_TAG, fout);
@@ -318,6 +318,7 @@ private:
         int intronNum; // which intron
         bool isEssentialSpliceSite;
 
+        annotation.push_back(AnnotationString[INSERTION]);
         if (g.isUpstream(variantPos, param.upstreamRange, &dist2Gene)) {
             annotation.push_back(AnnotationString[UPSTREAM]);
         } else if (g.isDownstream(variantPos, param.upstreamRange, &dist2Gene)) {
@@ -378,14 +379,163 @@ private:
         *annotationString += g.forwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING; 
         annotationString->push_back(WITHIN_GENE_SEPARATOR);
         *annotationString+=(stringJoin(annotation, WITHIN_GENE_SEPARATOR));
-        
-    }
-    
+    } // end annotateIns(...)
+    /**
+     * Deletion may across various regions
+     * we use std::set to store all regions it came across
+     * 
+     */
     void annotateDel(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
                      std::string* annotationString) {
-    }
+        Gene& g = this->geneList[chr][geneIdx];
+        std::set<AnnotationType> annotationSet;
+
+        // preprocessing alt.
+        std::string cleanedAlt;
+        if (alt == ".") {
+            cleanedAlt = "";
+        } else {
+            cleanedAlt = alt;
+        }
+
+        // might useful vars.
+        int dist2Gene;
+        int utrPos, utrLen;
+        int exonNum; // which exon
+        int codonNum; // which codon
+        int codonPos[3] = {0, 0, 0}; // the codon position
+        AnnotationType type; // could be one of 
+        int intronNum; // which intron
+        bool isEssentialSpliceSite;
+
+        // calculate range of the deletion
+        // some cases:
+        // e.g. ref = AG cleanedAlt = A
+        // e.g. ref = AG cleanedAlt = ""
+        int delBeg = variantPos + cleanedAlt.size();  // delBeg: inclusive
+        int delEnd = variantPos + ref.size(); // delEnd: exclusive
+        
+        std::string overlappedCdsBase; // bases in the cds (if any)
+        annotationSet.insert(DELETION);
+        for (int pos = delBeg; pos < delEnd; pos++) {
+            if (g.isUpstream(pos, param.upstreamRange, &dist2Gene)) {
+                annotationSet.insert(UPSTREAM);
+            } else if (g.isDownstream(pos, param.upstreamRange, &dist2Gene)) {
+                annotationSet.insert(DOWNSTREAM);
+            } else if (g.isExon(pos, &exonNum)){//, &codonNum, codonPos)) {
+                annotationSet.insert(EXON);
+                if (!g.isNonCoding()) {
+                    if (g.is5PrimeUtr(pos, &utrPos, &utrLen)) {
+                        annotationSet.insert(UTR5);
+                    } else if (g.is3PrimeUtr(pos, &utrPos, &utrLen)) {
+                        annotationSet.insert(UTR3);
+                    } else { // cds part has base change
+                        overlappedCdsBase.push_back(ref[ pos - delBeg ]);
+                    }
+                } else {
+                    annotationSet.insert(NONCODING);
+                }
+                // check splice site
+                if (g.isSpliceSite(pos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
+                    if (isEssentialSpliceSite)
+                        annotationSet.insert(ESSENTIAL_SPLICE_SITE);
+                    else 
+                        annotationSet.insert(NORMAL_SPLICE_SITE);
+                }
+            } else if (g.isIntron(pos, &intronNum)) {
+                annotationSet.insert(INTRON);
+                // check splice site
+                if (g.isSpliceSite(pos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
+                    if (isEssentialSpliceSite)
+                        annotationSet.insert(ESSENTIAL_SPLICE_SITE);
+                    else 
+                        annotationSet.insert(NORMAL_SPLICE_SITE);
+                }
+            } else {
+                //annotation.push_back("Intergenic");
+            }
+        } // end for
+        // check how many codon in cds are delete
+        if (overlappedCdsBase.size() > 0) {
+            if (overlappedCdsBase.size() % 3 == 0) {
+                annotationSet.insert(CODON_LOSS);
+            } else {
+                annotationSet.insert(FRAME_SHIFT);
+            }
+        }
+        // store all existing annotation
+        std::vector<std::string> annotation;
+        for (std::set<AnnotationType>::const_iterator it = annotationSet.begin(); 
+             it != annotationSet.end();
+             it++) {
+            annotation.push_back(AnnotationString[*it]);
+        };
+
+        *annotationString += g.name;
+        *annotationString += g.forwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING; 
+        annotationString->push_back(WITHIN_GENE_SEPARATOR);
+        *annotationString+=(stringJoin(annotation, WITHIN_GENE_SEPARATOR));
+    };
+    /**
+     * SV is the most complex scenario. fully support this is an ongoing work.
+     * We will just annotation the region in the rough scale.
+     */
     void annotateSV(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
                     std::string* annotationString) {
+        Gene& g = this->geneList[chr][geneIdx];
+        std::vector<std::string> annotation;
+
+        // might useful vars.
+        int dist2Gene;
+        int utrPos, utrLen;
+        int exonNum; // which exon
+        int codonNum; // which codon
+        int codonPos[3] = {0, 0, 0}; // the codon position
+        AnnotationType type; // could be one of 
+        int intronNum; // which intron
+        bool isEssentialSpliceSite;
+        annotation.push_back(AnnotationString[STRUCTURE_VARIATION]);
+        if (g.isUpstream(variantPos, param.upstreamRange, &dist2Gene)) {
+            annotation.push_back(AnnotationString[UPSTREAM]);
+        } else if (g.isDownstream(variantPos, param.upstreamRange, &dist2Gene)) {
+            annotation.push_back(AnnotationString[DOWNSTREAM]);
+        } else if (g.isExon(variantPos, &exonNum)){//, &codonNum, codonPos)) {
+            annotation.push_back(AnnotationString[EXON]);
+            if (!g.isNonCoding()) {
+                if (g.is5PrimeUtr(variantPos, &utrPos, &utrLen)) {
+                    annotation.push_back(AnnotationString[UTR5]);
+                } else if (g.is3PrimeUtr(variantPos, &utrPos, &utrLen)) {
+                    annotation.push_back(AnnotationString[UTR3]);
+                } else { // cds part has base change
+                    annotation.push_back(AnnotationString[CODON_REGION]);
+                }
+            } else{
+                annotation.push_back(AnnotationString[NONCODING]);
+            }
+            // check splice site
+            if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
+                if (isEssentialSpliceSite)
+                    annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
+                else 
+                    annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
+            }
+        } else if (g.isIntron(variantPos, &intronNum)) {
+            annotation.push_back(AnnotationString[INTRON]);
+            // check splice site
+            if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
+                if (isEssentialSpliceSite)
+                    annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
+                else 
+                    annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
+            }
+        } else {
+            //annotation.push_back("Intergenic");
+        }
+        *annotationString += g.name;
+        *annotationString += g.forwardStrand ? "(+)" : "(-)"; 
+        annotationString->push_back('|');
+        *annotationString+=(stringJoin(annotation, "|"));
+
     }
     void annotateSNP(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
                      std::string* annotationString) {
@@ -524,11 +674,18 @@ private:
         if (alt.find(',') != std::string::npos) {
             return MIXED;
         }
-        const char* BASE = "ACGT";
+        // NOTE: a single "." is used for deletion; but "G." can represent uncertain breakpoint
+        //       we will check the former case first.
+        if (alt == ".") {
+            return DEL;
+        }
+
+        const char* ALLOWED_BASE = "ACGT"; 
         unsigned int refLen = ref.size();
         unsigned int altLen = alt.size();
-        if (alt.find_first_not_of(BASE) != std::string::npos) {
-            //contain 
+        if (alt.find_first_not_of(ALLOWED_BASE) != std::string::npos) {
+            // NOTE: SV usually contain "[" or "]" for rearrangment 
+            //       ">", "<" for haplotypes or large deletion/insertion.
             return SV;
         }
         if (refLen == altLen) {
@@ -602,7 +759,6 @@ int main(int argc, char *argv[])
 
     LOG_END_TIME;
     LOG_END ;
-
 #else
     // debug purpose
     GeneAnnotation ga;
@@ -612,5 +768,6 @@ int main(int argc, char *argv[])
     ga.openReferenceGenome("test.fa");
     ga.annotate("test.vcf", "test.output.vcf");
 #endif
+    printf("Annotation succeed!\n");
     return 0;
 }

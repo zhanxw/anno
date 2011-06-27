@@ -65,7 +65,7 @@ std::string stringJoin(const std::vector<std::string>& input, const T delim) {
  * for std::string type, we use reference to save memory.
  */
 template <>
-std::string stringJoin(const std::vector<std::string>& input, const std::string& delim) {
+std::string stringJoin<const std::string&>(const std::vector<std::string>& input, const std::string& delim) {
     std::string s;
     if (input.size() == 0) {
         return s;
@@ -77,7 +77,6 @@ std::string stringJoin(const std::vector<std::string>& input, const std::string&
     }
     return s;
 };
-
 
 std::string toUpper(const std::string& s) {
     std::string r;
