@@ -219,7 +219,7 @@ class Gene{
      * @return true: if codonPos[3] are all valid position
      * @param codonNum : which base (inclusive, 1-based) has mutation
      */
-    bool calculatCodonPosition(const int variantPos, int* codonNum, int codonPos[3]){
+    bool calculateCodonPosition(const int variantPos, int* codonNum, int codonPos[3]){
         *codonNum = 0;
         if (this->forwardStrand) {
             unsigned int i;
