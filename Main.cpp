@@ -34,6 +34,7 @@
 #include "Argument.h"
 #include "IO.h"
 #include "StringUtil.h"
+#include "LogFile.h"
 
 #include "Codon.h"
 #include "GenomeSequence.h"
@@ -489,16 +490,23 @@ int main(int argc, char *argv[])
     }
 
 #if 1
+    LOG_START("test.log");
+    LOG_START_TIME;
+
     GeneAnnotation ga;
     pl.Status();
     if (FLAG_referenceFile.size() != 0) {
         ga.openReferenceGenome(FLAG_referenceFile.c_str());
         ga.openCodonFile("codon.txt");
     }
-
+    
     ga.setFormat(FLAG_geneFileFormat);
     ga.openGeneFile(FLAG_geneFile.c_str());
     ga.annotate(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
+
+    LOG_END_TIME;
+    LOG_END ;
+
 #else
     // debug purpose
     GeneAnnotation ga;

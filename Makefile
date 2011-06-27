@@ -8,7 +8,7 @@ release: $(EXEC)
 debug: CXXFLAGS = -g $(DEFAULT_CXXFLAGS)
 debug: $(EXEC)
 
-Main: Main.cpp Gene.h Range.h IO.h
+Main: Main.cpp Gene.h Range.h IO.h Argument.h
 	g++ $(CXXFLAGS) -c Main.cpp -I../statgen/lib/general
 	g++ $(CXXFLAGS) -o Main Main.o ../statgen/lib/libStatGen.a -lz -lbz2 -lssl -lcrypto
 clean:
@@ -17,3 +17,5 @@ test1: debug
 	./Main -i test.vcf -r test.fa -g test.gene.txt -o test.out.vcf
 test2: debug
 	./Main -i 100.vcf.gz -r test.fa -g refFlat_hg19.txt.gz -o 100.out.vcf
+Log: LogFile.cpp LogFile.h
+	g++ -g -o $@ $<

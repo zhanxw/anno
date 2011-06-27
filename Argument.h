@@ -205,14 +205,15 @@ class ParameterParser{
             free(argv);
 
     };
+    void WriteToFile(FILE* fp){
+        assert(fp);
+        this->WriteToFileWithComment(fp, "");
+    };
     void WriteToFile(const char* fileName) {
         this->WriteToFileWithComment(fileName, "");
     };
-    // write all transated parameters to @param fileName
-    // the first line with be @param comment
-    // or the information when we write to file.
-    void WriteToFileWithComment(const char* fileName, const char* comment) {
-        FILE* fp = fopen(fileName, "w");
+    void WriteToFileWithComment(FILE* fp, const char* comment) {
+        assert(fp);
         if (strlen(comment) > 0) {
             fprintf(fp, "# %s\n", comment);
         } else {
@@ -268,6 +269,14 @@ class ParameterParser{
             fprintf(fp, " \"%s\"", (*this->ptrRemainingArg)[i].c_str());
         }            
         fprintf(fp, "\n");
+    }
+    // write all transated parameters to @param fileName
+    // the first line with be @param comment
+    // or the information when we write to file.
+    void WriteToFileWithComment(const char* fileName, const char* comment) {
+        FILE* fp = fopen(fileName, "w");
+        assert(fp);
+        this->WriteToFileWithComment(fp, comment);
         fclose(fp);
     };
     void Read(int argc, char** argv) {
@@ -368,10 +377,10 @@ class ParameterParser{
   Format illustration:
   Individual Filter : --indvDepthMin [], --indvDepthMax [], --indvQualMin []
   <- group name widt ->   <----------- flag name width ------------------------->
-  20          3                    55
+  27          3                    50
 */        
-        const int GROUP_WIDTH = 20;
-        const int FLAG_WIDTH = 55;
+        const int GROUP_WIDTH = 27;
+        const int FLAG_WIDTH = 50;
         const char SEP[] = " : ";
         const char EMPTY_SEP[] = "   ";
 
