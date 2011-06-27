@@ -28,9 +28,9 @@
     time_t INTERNAL_time_start;                                         \
     do {                                                                \
         time(&INTERNAL_time_start);                                     \
-        LOG << "Analysis program "                                      \
+        LOG << "Analysis program [ "                                    \
             << LogFile::getLogger()->getProgName()                      \
-            << " started on " << ctime(&INTERNAL_time_start);           \
+            << " ] started on " << ctime(&INTERNAL_time_start);         \
     } while(0);
 #define LOG_END_TIME                                            \
     time_t INTERNAL_time_end;                                   \
@@ -41,7 +41,10 @@
             <<" second(s) and finished at "                     \
             << ctime(&INTERNAL_time_end);                       \
     }while(0);
-
+#define LOG_PARAMETER(pl)                                       \
+    do {                                                        \
+        pl.WriteToStream(LogFile::getLogger()->getStream());    \
+    } while(0);
 
 // Use so-called Singleton pattern 
 // so that program-wide there is only one LogFile instance.

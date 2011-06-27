@@ -3,7 +3,7 @@
  * 3. output format are configurable.
  *    user specify
  * 4. output basis statisitcs:
- *    freq of each annotation  .anno.freq 
+ *    freq of each annotation  .anno.freq
  *    freq of each base change .base.freq
  *    freq of codon change     .codon.freq
  *    freq of indel length     .indel.freq
@@ -29,6 +29,20 @@
 #include "Gene.h"
 #include "GeneFormat.h"
 #include "SequenceUtil.h"
+
+
+void banner(FILE* fp) {
+const char* string =
+"..............................................       \n"
+" ...      G(ene) A(nnotation)                ...     \n"
+"  ...      Xiaowei Zhan, Goncalo Abecasis     ...    \n"
+"   ...      zhanxw@umich.edu                    ...  \n"
+"    ...      Jun 2011                            ... \n"
+"     ................................................\n" 
+"                                                     \n"
+;
+fputs(string, fp);
+};
 
 typedef enum {
     SNP = 0,
@@ -57,7 +71,7 @@ typedef enum {
     START_GAIN,
     START_LOSS,
     NORMAL_SPLICE_SITE,
-    ESSENTIAL_SPLICE_SITE,  
+    ESSENTIAL_SPLICE_SITE,
     FRAME_SHIFT,            /* Indel length is not divisible by 3 */
     CODON_GAIN,             /* Insertion length is divisible by 3 */
     CODON_LOSS,             /* Deletion length is divisible by 3 */
@@ -70,7 +84,7 @@ const char* AnnotationString[]= {
     "Insertion",
     "Deletion",
     "StructuralVariation",
-    "Upstream", 
+    "Upstream",
     "Downstream",
     "Utr5",
     "Utr3",
@@ -140,7 +154,7 @@ public:
         // make sure genes are ordered
         this->sortGene();
         return;
-    }; 
+    };
     void openCodonFile(const char* codonFileName) {
         this->codon.open(codonFileName);
     };
@@ -153,7 +167,7 @@ public:
         // open output file
         FILE* fout = fopen(outputFileName, "wt");
         assert(fout);
-        
+
         // open input file
         std::vector<std::string> annotationString;
         std::string geneAnnotation;
@@ -174,14 +188,14 @@ public:
             std::string alt = toUpper(field[4]);
             std::vector<unsigned> potentialGeneIdx;
             this->findInRangeGene(field[0], &pos, &potentialGeneIdx);
-            // if Introgenic,  we will have (potentialGeneIdx.size() == 0) 
+            // if Introgenic,  we will have (potentialGeneIdx.size() == 0)
             annotationString.clear();
             geneAnnotation.clear();
             for (unsigned int i = 0; i < potentialGeneIdx.size(); i++) {
                 this->annotateByGene(potentialGeneIdx[i], chr, pos, ref, alt, &geneAnnotation);
                 annotationString.push_back(geneAnnotation);
                 // printf("%s %d ref=%s alt=%s has annotation: %s\n",
-                //        chr.c_str(), pos, 
+                //        chr.c_str(), pos,
                 //        ref.c_str(), alt.c_str(),
                 //        annotationString.c_str());
             }
@@ -224,7 +238,7 @@ private:
         }
     };
     // store results in @param potentialGeneIdx
-    // find gene whose range plus downstream/upstream overlaps chr:pos 
+    // find gene whose range plus downstream/upstream overlaps chr:pos
     void findInRangeGene(const std::string& chr, int* pos, std::vector<unsigned int>* potentialGeneIdx) {
         assert(potentialGeneIdx);
         potentialGeneIdx->clear();
@@ -233,14 +247,14 @@ private:
         unsigned int gLen = g.size();
         if (gLen == 0) {
             return;
-        } 
+        }
         int maxDist = (param.upstreamRange > param.downstreamRange) ? param.upstreamRange : param.downstreamRange;
         Range r ((*pos - maxDist), (*pos + maxDist));
         for (unsigned int i = 0; i < gLen; i++ ){
             if (g[i].tx.start <= r.start) {
                 if (g[i].tx.end < r.start){
                     continue;
-                } else 
+                } else
                     potentialGeneIdx->push_back(i);
             } else if (r.isInRange(g[i].tx.start)) {
                 potentialGeneIdx->push_back(i);
@@ -258,11 +272,11 @@ private:
     };
     /**
      * fill the actual base in @param refTriplet and @param altTriplet
-     * we consider @param forwardStrand, so for forward strand, we copy from this->reference, 
+     * we consider @param forwardStrand, so for forward strand, we copy from this->reference,
      * or, we copy the reverse complement from this->reference
      */
-    void fillTriplet(const std::string& chr, const int variantPos, const int codonPos[3], bool forwardStrand,  
-                     const std::string& ref, const std::string& alt, 
+    void fillTriplet(const std::string& chr, const int variantPos, const int codonPos[3], bool forwardStrand,
+                     const std::string& ref, const std::string& alt,
                      char refTriplet[3], char altTriplet[3]) {
         assert(ref.size() == 1 && alt.size() == 1);
         const std::string& seq = this->gs[chr];
@@ -314,7 +328,7 @@ private:
         int exonNum; // which exon
         int codonNum; // which codon
         int codonPos[3] = {0, 0, 0}; // the codon position
-        AnnotationType type; // could be one of 
+        AnnotationType type; // could be one of
         int intronNum; // which intron
         bool isEssentialSpliceSite;
 
@@ -343,7 +357,7 @@ private:
                             triplet[1] = alt[i++];
                             triplet[2] = alt[i++];
                             if (!g.forwardStrand)
-                                reverseComplementTriplet(triplet); 
+                                reverseComplementTriplet(triplet);
                             aaName = this->codon.toAA(triplet);
                             s+= aaName;
                         }
@@ -351,7 +365,7 @@ private:
                         annotation.push_back(s);
                     } else {
                         annotation.push_back(AnnotationString[FRAME_SHIFT]);
-                    } 
+                    }
                 }
             } else {
                 annotation.push_back(AnnotationString[NONCODING]);
@@ -360,7 +374,7 @@ private:
             if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
                 if (isEssentialSpliceSite)
                     annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
-                else 
+                else
                     annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
             }
         } else if (g.isIntron(variantPos, &intronNum)) {
@@ -369,21 +383,21 @@ private:
             if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
                 if (isEssentialSpliceSite)
                     annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
-                else 
+                else
                     annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
             }
         } else {
             //annotation.push_back("Intergenic");
         }
         *annotationString += g.name;
-        *annotationString += g.forwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING; 
+        *annotationString += g.forwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING;
         annotationString->push_back(WITHIN_GENE_SEPARATOR);
         *annotationString+=(stringJoin(annotation, WITHIN_GENE_SEPARATOR));
     } // end annotateIns(...)
     /**
      * Deletion may across various regions
      * we use std::set to store all regions it came across
-     * 
+     *
      */
     void annotateDel(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
                      std::string* annotationString) {
@@ -404,7 +418,7 @@ private:
         int exonNum; // which exon
         int codonNum; // which codon
         int codonPos[3] = {0, 0, 0}; // the codon position
-        AnnotationType type; // could be one of 
+        AnnotationType type; // could be one of
         int intronNum; // which intron
         bool isEssentialSpliceSite;
 
@@ -414,7 +428,7 @@ private:
         // e.g. ref = AG cleanedAlt = ""
         int delBeg = variantPos + cleanedAlt.size();  // delBeg: inclusive
         int delEnd = variantPos + ref.size(); // delEnd: exclusive
-        
+
         std::string overlappedCdsBase; // bases in the cds (if any)
         annotationSet.insert(DELETION);
         for (int pos = delBeg; pos < delEnd; pos++) {
@@ -439,7 +453,7 @@ private:
                 if (g.isSpliceSite(pos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
                     if (isEssentialSpliceSite)
                         annotationSet.insert(ESSENTIAL_SPLICE_SITE);
-                    else 
+                    else
                         annotationSet.insert(NORMAL_SPLICE_SITE);
                 }
             } else if (g.isIntron(pos, &intronNum)) {
@@ -448,7 +462,7 @@ private:
                 if (g.isSpliceSite(pos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
                     if (isEssentialSpliceSite)
                         annotationSet.insert(ESSENTIAL_SPLICE_SITE);
-                    else 
+                    else
                         annotationSet.insert(NORMAL_SPLICE_SITE);
                 }
             } else {
@@ -465,14 +479,14 @@ private:
         }
         // store all existing annotation
         std::vector<std::string> annotation;
-        for (std::set<AnnotationType>::const_iterator it = annotationSet.begin(); 
+        for (std::set<AnnotationType>::const_iterator it = annotationSet.begin();
              it != annotationSet.end();
              it++) {
             annotation.push_back(AnnotationString[*it]);
         };
 
         *annotationString += g.name;
-        *annotationString += g.forwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING; 
+        *annotationString += g.forwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING;
         annotationString->push_back(WITHIN_GENE_SEPARATOR);
         *annotationString+=(stringJoin(annotation, WITHIN_GENE_SEPARATOR));
     };
@@ -491,7 +505,7 @@ private:
         int exonNum; // which exon
         int codonNum; // which codon
         int codonPos[3] = {0, 0, 0}; // the codon position
-        AnnotationType type; // could be one of 
+        AnnotationType type; // could be one of
         int intronNum; // which intron
         bool isEssentialSpliceSite;
         annotation.push_back(AnnotationString[STRUCTURE_VARIATION]);
@@ -516,7 +530,7 @@ private:
             if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
                 if (isEssentialSpliceSite)
                     annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
-                else 
+                else
                     annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
             }
         } else if (g.isIntron(variantPos, &intronNum)) {
@@ -525,14 +539,14 @@ private:
             if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
                 if (isEssentialSpliceSite)
                     annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
-                else 
+                else
                     annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
             }
         } else {
             //annotation.push_back("Intergenic");
         }
         *annotationString += g.name;
-        *annotationString += g.forwardStrand ? "(+)" : "(-)"; 
+        *annotationString += g.forwardStrand ? "(+)" : "(-)";
         annotationString->push_back('|');
         *annotationString+=(stringJoin(annotation, "|"));
 
@@ -548,7 +562,7 @@ private:
         int exonNum; // which exon
         int codonNum; // which codon
         int codonPos[3] = {0, 0, 0}; // the codon position
-        AnnotationType type; // could be one of 
+        AnnotationType type; // could be one of
         int intronNum; // which intron
         bool isEssentialSpliceSite;
 
@@ -608,7 +622,7 @@ private:
             if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
                 if (isEssentialSpliceSite)
                     annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
-                else 
+                else
                     annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
             }
         } else if (g.isIntron(variantPos, &intronNum)) {
@@ -617,19 +631,19 @@ private:
             if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
                 if (isEssentialSpliceSite)
                     annotation.push_back(AnnotationString[ESSENTIAL_SPLICE_SITE]);
-                else 
+                else
                     annotation.push_back(AnnotationString[NORMAL_SPLICE_SITE]);
             }
         } else {
             //annotation.push_back("Intergenic");
         }
         *annotationString += g.name;
-        *annotationString += g.forwardStrand ? "(+)" : "(-)"; 
+        *annotationString += g.forwardStrand ? "(+)" : "(-)";
         annotationString->push_back('|');
         *annotationString+=(stringJoin(annotation, "|"));
     }
     /**
-     * 
+     *
      */
     void annotateByGene(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
                         std::string* annotationString){
@@ -680,11 +694,11 @@ private:
             return DEL;
         }
 
-        const char* ALLOWED_BASE = "ACGT"; 
+        const char* ALLOWED_BASE = "ACGT";
         unsigned int refLen = ref.size();
         unsigned int altLen = alt.size();
         if (alt.find_first_not_of(ALLOWED_BASE) != std::string::npos) {
-            // NOTE: SV usually contain "[" or "]" for rearrangment 
+            // NOTE: SV usually contain "[" or "]" for rearrangment
             //       ">", "<" for haplotypes or large deletion/insertion.
             return SV;
         }
@@ -698,7 +712,7 @@ private:
             return DEL;
         } else if (refLen < altLen) {
             return INS;
-        } 
+        }
         return UNKNOWN;
     };
 private:
@@ -712,6 +726,8 @@ private:
 };
 int main(int argc, char *argv[])
 {
+    banner(stdout);
+
     BEGIN_PARAMETER_LIST(pl)
         ADD_STRING_PARAMETER(pl, inputFile, "-i", "Specify input VCF file")
         ADD_STRING_PARAMETER(pl, outputFile, "-o", "Specify output VCF file")
@@ -720,11 +736,11 @@ int main(int argc, char *argv[])
         ADD_STRING_PARAMETER(pl, geneFileFormat, "-f", "Specify gene file format (default: refFlat, other options knownGene)")
         END_PARAMETER_LIST(pl)
         ;
-    
+
     pl.Read(argc, argv);
     if (FLAG_geneFileFormat.size() == 0) {
         FLAG_geneFileFormat = "refFlat";
-    }        
+    }
 
     if (FLAG_inputFile.size() == 0) {
         pl.Help();
@@ -745,14 +761,14 @@ int main(int argc, char *argv[])
 #if 1
     LOG_START("test.log");
     LOG_START_TIME;
-
+    LOG_PARAMETER(pl);
     GeneAnnotation ga;
     pl.Status();
     if (FLAG_referenceFile.size() != 0) {
         ga.openReferenceGenome(FLAG_referenceFile.c_str());
         ga.openCodonFile("codon.txt");
     }
-    
+
     ga.setFormat(FLAG_geneFileFormat);
     ga.openGeneFile(FLAG_geneFile.c_str());
     ga.annotate(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());

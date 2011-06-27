@@ -11,6 +11,7 @@
 #include <map>
 #include <queue>
 #include <vector>
+#include <iostream>
 
 #include "OrderedMap.h"
 #include "TypeConversion.h"
@@ -279,6 +280,69 @@ class ParameterParser{
         this->WriteToFileWithComment(fp, comment);
         fclose(fp);
     };
+    /**
+     * WriteToStreamWithComment() is EXACTLY the rewrite of WriteToFileWithComment()
+     * This repetative work is for output LOG file
+     */
+    void WriteToStreamWithComment(std::ostream& fout, const char* comment) {
+        if (strlen(comment) > 0) {
+            fout << "# " << comment << "\n";
+        } else {
+            char hostName[128] = "";
+            if (gethostname(hostName, 128) == 0) {
+                // succes
+            } else {
+                // failed
+                sprintf(hostName, "Unknown");
+            }
+            time_t tt = time(0);
+            // ctime() will output an extra \n
+            fout << "# ParameterList created by " << getlogin() << " on "<< hostName << " at " << ctime(&tt);
+        }
+        int numFlagOutputted = 0;
+        for (int i = 0; i < this->flagVec.size(); i++){
+            FlagInfo& fi = this->flagInfoMap[i];
+            if (fi.isParsed) {
+                // separate different flags
+                if (numFlagOutputted)
+                    fout << " ";
+
+                if (fi.isLongParam)
+                    fout << "--";
+                else 
+                    fout << "-";
+                fout << flagVec[i];
+                switch(fi.pt) {
+                case BOOL_TYPE:
+                    break;
+                case INT_TYPE:
+                    fout << " " << *(int*)fi.data;
+                    break;
+                case DOUBLE_TYPE:
+                    fout << " " << *(double*)fi.data;
+                    break;
+                case STRING_TYPE:
+                    fout << " \""<< *((std::string*)fi.data) <<  "\"";
+                    break;
+                default:
+                    fprintf(stderr, "WARNING: Unrecognized parameter type for flag \"%s\"\n", this->flagVec[i].c_str());
+                    return;
+                }
+                numFlagOutputted ++;
+            }
+        }
+        for (int i = 0; i < this->ptrRemainingArg->size(); i++) {
+            // separate different flags
+            if (numFlagOutputted)
+                fout << " ";
+            // output each remaining argument
+            fout << " \"" << (*this->ptrRemainingArg)[i] << "\"";
+        }            
+        fout << "\n";
+    }
+    void WriteToStream(std::ostream& fout) {
+        this->WriteToStreamWithComment(fout, "");
+    }
     void Read(int argc, char** argv) {
         std::string flag;
         for (int i = 1; i < argc; i++) {
