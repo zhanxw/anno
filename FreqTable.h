@@ -28,7 +28,11 @@ public:
         *v = this->orderedData[idx].first;
         *t = *(this->orderedData[idx].second);
     };
-        
+    void clear() {
+        this->data.clear();
+        this->orderedData.clear();
+        this->isSorted = false;
+    };
 private:
     void sort() {
         this->orderedData.clear();

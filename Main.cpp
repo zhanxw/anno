@@ -18,19 +18,19 @@
 #include "Gene.h"
 #include "GeneFormat.h"
 #include "SequenceUtil.h"
-
+#include "FreqTable.h"
 
 void banner(FILE* fp) {
-const char* string =
-"..............................................       \n"
-" ...      G(ene) A(nnotation)                ...     \n"
-"  ...      Xiaowei Zhan, Goncalo Abecasis     ...    \n"
-"   ...      zhanxw@umich.edu                    ...  \n"
-"    ...      Jun 2011                            ... \n"
-"     ................................................\n" 
-"                                                     \n"
-;
-fputs(string, fp);
+    const char* string =
+        "..............................................       \n"
+        " ...      G(ene) A(nnotation)                ...     \n"
+        "  ...      Xiaowei Zhan, Goncalo Abecasis     ...    \n"
+        "   ...      zhanxw@umich.edu                    ...  \n"
+        "    ...      Jun 2011                            ... \n"
+        "     ................................................\n" 
+        "                                                     \n"
+        ;
+    fputs(string, fp);
 };
 
 typedef enum {
@@ -95,17 +95,7 @@ const char* AnnotationString[]= {
     "Introgenic",
     "Noncoding"
 };
-struct GeneAnnotationParam{
-    GeneAnnotationParam():
-        upstreamRange(500),
-        downstreamRange(500),
-        spliceIntoExon(3),
-        spliceIntoIntron(8) {};
-    int upstreamRange;      // upstream def
-    int downstreamRange;    // downstream def
-    int spliceIntoExon;     // essential splice site def
-    int spliceIntoIntron;   // essentail splice site def
-};
+
 
 // here we define format or the annotation.
 #define FORWARD_STRAND_STRING "(+)"
@@ -116,6 +106,48 @@ struct GeneAnnotationParam{
 #define WITHIN_GENE_SEPARATOR '|'
 #define WITHIN_GENE_LEFT_DELIM '('
 #define WITHIN_GENE_RIGHT_DELIM ')'
+
+/**
+ * For each gene, we use AnnotationResult to store all annotation results.
+ */
+class AnnotationResult{
+public:
+    void reset() {
+        this->data.clear();
+        this->freq.clear();
+    }
+    void clear() {
+        this->data.clear();
+    };
+    std::string toString(){
+        return stringJoin(this->data, GENE_SEPARATOR);
+    };
+    void add(const AnnotationType& t) {
+        this->data.push_back(AnnotationString[t]);
+        this->freq.add(t);
+    };
+    // add extra details such as "(CCT/Pro->CAT/His)" to the last element
+    template<class T>
+    void addDetail(const T& s) {
+        unsigned int n = this->data.size();
+        assert( n > 0);
+        this->data[n-1] += s;
+    };
+private:
+    std::vector<std::string> data;
+    FreqTable<AnnotationType> freq;
+};
+struct GeneAnnotationParam{
+    GeneAnnotationParam():
+        upstreamRange(50),
+        downstreamRange(50),
+        spliceIntoExon(3),
+        spliceIntoIntron(8) {};
+    int upstreamRange;      // upstream def
+    int downstreamRange;    // downstream def
+    int spliceIntoExon;     // essential splice site def
+    int spliceIntoIntron;   // essentail splice site def
+};
 
 class GeneAnnotation{
 public:
@@ -723,8 +755,15 @@ private:
     GenomeSequence gs;
     Codon codon;
     GeneFormat format;
-    bool allowMixedVariation; // ALT may has more than one variation e..g A,C
+    bool allowMixedVariation;       // VCF ALT field may have more than one variation e..g A,C
+
+    AnnotationResult geneAnnotation;
+    // FreqTable<std::string> annotationTypeFreq; // annotation type frequency
+    // FreqTable<std::string> baseFreq;           // base change frequency
+    // FreqTable<std::string> codonFreq;          // codon change frequency
+    // FreqTable<int> indelLengthFreq; // for insertion, the value is positive; for deletion, positive
 };
+
 int main(int argc, char *argv[])
 {
     banner(stdout);
