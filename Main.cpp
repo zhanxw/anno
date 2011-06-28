@@ -272,19 +272,76 @@ public:
         fclose(fout);
         fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
         LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
+        
+        // output frequency files
+        std::string fn = outputFileName;
+        // output annotation frequency
+        std::string ofs = fn+".anno.frq";
+        this->printAnnotationFrequency(ofs.c_str());
+        fprintf(stdout, "DONE: Generated frequency of each annotype type in [ %s ].\n", ofs.c_str());
+        LOG << "Generate frequency of each annotation type in " << ofs << " succeed!\n";
+
+        // output base change frequency
+        ofs = fn+".base.frq";
+        this->printBaseChangeFrequncy(ofs.c_str());
+        fprintf(stdout, "DONE: Generated frequency of each base change in [ %s ].\n", ofs.c_str());
+        LOG << "Generate frequency of each base change in " << ofs << " succeed!\n";
+
+        //TODO
+        // output codon change frequency
+/*
+        ofs = fn+".codon.frq";
+        this->printAnnotationFrequency(ofs.c_str());
+        fprintf(stdout, "DONE: Generated frequency of each codon change in [ %s ].\n", ofs.c_str());
+        LOG << "Generate frequency of each codon change in " << ofs << " succeed!\n";
+*/
+        //TODO (fix this!)
+        // output indel length frequency
+        ofs = fn+".indel.frq";
+        this->printIndelLengthFrequency(ofs.c_str());
+        fprintf(stdout, "DONE: Generated frequency of indel length in [ %s ].\n", ofs.c_str());
+        LOG << "Generate frequency of indel length in " << ofs << " succeed!\n";
+
         return;
     };
     void setAnnotationParameter(GeneAnnotationParam& param) {
         this->param = param;
     };
-    void printAnnotationFrequency(){
+    void printAnnotationFrequency(const char* fileName){
+        FILE* fp = fopen(fileName, "wt");
+        assert(fp);
         unsigned int n = this->geneAnnotation.getFreq().size();
         for (unsigned int i = 0; i < n; i++){
             AnnotationType t;
             int count;
             this->geneAnnotation.getFreq().at(i, &t, &count);
-            fprintf(stdout, "%s: %d\n", AnnotationString[t], count);
+            fprintf(fp, "%s\t%d\n", AnnotationString[t], count);
         }
+        fclose(fp);
+    };
+    void printBaseChangeFrequncy(const char* fileName){
+        FILE* fp = fopen(fileName, "wt");
+        assert(fp);
+        unsigned int n = this->baseFreq.size();
+        for (unsigned int i = 0; i < n; i++){
+            std::string k;
+            int count;
+            this->baseFreq.at(i, &k, &count);
+            fprintf(fp, "%s\t%d\n", k.c_str(), count);
+        }
+        fclose(fp);
+    };
+    void printIndelLengthFrequency(const char* fileName){
+        FILE* fp = fopen(fileName, "wt");
+        assert(fp);
+        unsigned int n = this->indelLengthFreq.size();
+        for (unsigned int i = 0; i < n; i++){
+            int key;
+            int count;
+            this->indelLengthFreq.at(i, &key, &count);
+            fprintf(fp, "%d\t%d\n", key, count);
+        }
+        fclose(fp);
     };
 private:
     // make sure genes are ordered
@@ -685,16 +742,20 @@ private:
         assert(annotationString);
         annotationString->clear();
         this->geneAnnotation.clear();
-        // check VARATION_TYPE
+        // check VARATION_TYPE 
+        // and record frequency
         switch(determineVariationType(ref, alt)) {
         case SNP:
             this->annotateSNP(geneIdx, chr, variantPos, ref, alt);
+            this->baseFreq.add(ref + "->" +alt);
             break;
         case INS:
             this->annotateIns(geneIdx, chr, variantPos, ref, alt);
+            this->indelLengthFreq.add(calculateIndelLength(ref, alt));
             break;
         case DEL:
             this->annotateDel(geneIdx, chr, variantPos, ref, alt);
+            this->indelLengthFreq.add(calculateIndelLength(ref, alt));
             break;
         case MIXED:
             if (this->allowMixedVariation) {
@@ -718,6 +779,17 @@ private:
 
         annotationString->assign(this->geneAnnotation.toString());
         return;
+    };
+    /**
+     * @return indel length, for insertion, return positive number; or return negative number
+     */
+    int calculateIndelLength(const std::string& ref, const std::string& alt){
+        int refLen = ref.size();
+        int altLen = alt.size();
+        if (alt == ".") {
+            altLen -- ;
+        }
+        return (altLen - refLen);
     };
     /**
      * @return the variation type depending on the first entry in the alt field
@@ -763,10 +835,9 @@ private:
     bool allowMixedVariation;       // VCF ALT field may have more than one variation e..g A,C
 
     AnnotationResult geneAnnotation;
-    // FreqTable<std::string> annotationTypeFreq; // annotation type frequency
-    // FreqTable<std::string> baseFreq;           // base change frequency
+    FreqTable<std::string> baseFreq;           // base change frequency
     // FreqTable<std::string> codonFreq;          // codon change frequency
-    // FreqTable<int> indelLengthFreq; // for insertion, the value is positive; for deletion, positive
+    FreqTable<int> indelLengthFreq; // for insertion, the value is positive; for deletion, positive
 };
 
 int main(int argc, char *argv[])
@@ -818,7 +889,6 @@ int main(int argc, char *argv[])
     ga.setFormat(FLAG_geneFileFormat);
     ga.openGeneFile(FLAG_geneFile.c_str());
     ga.annotate(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
-    ga.printAnnotationFrequency();
 
     LOG_END_TIME;
     LOG_END ;
