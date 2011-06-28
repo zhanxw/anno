@@ -35,8 +35,8 @@ public:
     /**
      * @return total number of chromosome
      */
-    int getGenomeLength() const {
-        int l = 0;
+    long int getGenomeLength() const {
+        long int l = 0;
         std::map<std::string, std::string>::const_iterator it;
         for (it = this->data.begin(); it != this->data.end() ; it++) {
             l += (it->second).size();

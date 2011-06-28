@@ -203,7 +203,7 @@ public:
     void openReferenceGenome(const char* referenceGenomeFileName) {
         fprintf(stdout, "Load reference genome %s...\n", referenceGenomeFileName);
         this->gs.open(referenceGenomeFileName);
-        fprintf(stdout, "DONE: %d chromosomes and %d bases are loaded.\n", this->gs.size(), this->gs.getGenomeLength());
+        fprintf(stdout, "DONE: %d chromosomes and %ld bases are loaded.\n", this->gs.size(), this->gs.getGenomeLength());
         LOG << "Reference genome file " << referenceGenomeFileName << " loads succeed!\n";
         return;
     };
