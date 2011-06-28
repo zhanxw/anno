@@ -27,6 +27,12 @@ char complementBase(const char c){
     }
 };
 
+void complementTriplet(char s[3]){
+    s[0] = complementBase(s[0]);
+    s[1] = complementBase(s[1]);
+    s[2] = complementBase(s[2]);
+};
+
 void reverseComplementTriplet(char s[3]){
     char t = s[0];
     s[0] = complementBase(s[2]);

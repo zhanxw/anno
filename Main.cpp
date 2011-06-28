@@ -439,10 +439,6 @@ private:
             altTriplet[1] = (variantPos != codonPos[1]) ? seq[codonPos[1] - 1] : alt[0];
             altTriplet[2] = (variantPos != codonPos[2]) ? seq[codonPos[2] - 1] : alt[0];
         }
-        if (!forwardStrand) {
-            reverseComplementTriplet(refTriplet);
-            reverseComplementTriplet(altTriplet);
-        }
     };
     AnnotationType determineSNVType(const std::string& refAAName, const std::string& altAAName, const int codonNum){
         if (refAAName == Codon::unknownAA || altAAName == Codon::unknownAA) {
@@ -717,7 +713,10 @@ private:
                         // when reference genome is provided
                         if (this->gs.size() >0){
                             this->fillTriplet(chr, variantPos, codonPos, g.forwardStrand, ref, alt, refTriplet, altTriplet);
-
+                            if (!g.forwardStrand){
+                                complementTriplet(refTriplet);
+                                complementTriplet(altTriplet);
+                            };
                             refAAName = this->codon.toAA(refTriplet);
                             altAAName = this->codon.toAA(altTriplet);
                             annotationType = this->determineSNVType(refAAName, altAAName, codonNum);
