@@ -233,20 +233,45 @@ public:
             int pos = toInt(field[1]);
             std::string ref = toUpper(field[3]);
             std::string alt = toUpper(field[4]);
+
+            // check VARATION_TYPE 
+            std::string singleAlt = alt;
+            VARIATION_TYPE type = determineVariationType(ref, alt);
+            if (type == MIXED) {
+                // only annotate the first variation
+                int commaPos = alt.find(',');
+                singleAlt = alt.substr(0, commaPos);
+                type = determineVariationType(ref, alt);
+            }
+
+            // find near target genes
             std::vector<unsigned> potentialGeneIdx;
             this->findInRangeGene(field[0], &pos, &potentialGeneIdx);
             // if Introgenic,  we will have (potentialGeneIdx.size() == 0)
             annotationString.clear();
             geneAnnotation.clear();
+            // determine variation type
+            
             for (unsigned int i = 0; i < potentialGeneIdx.size(); i++) {
-                this->annotateByGene(potentialGeneIdx[i], chr, pos, ref, alt, &geneAnnotation);
+                this->annotateByGene(potentialGeneIdx[i], chr, pos, ref, alt, type, &geneAnnotation);
                 annotationString.push_back(geneAnnotation);
                 // printf("%s %d ref=%s alt=%s has annotation: %s\n",
                 //        chr.c_str(), pos,
                 //        ref.c_str(), alt.c_str(),
                 //        annotationString.c_str());
             }
-
+            // record frquency info
+            switch (type) {
+            case SNP:
+                this->baseFreq.add(ref + "->" +alt);
+                break;
+            case INS:
+            case DEL:
+                this->indelLengthFreq.add(calculateIndelLength(ref, alt));
+            default:
+                break;
+            }
+            
             // output annotation result
             // VCF info field is the 8th column
             for (unsigned int i = 0; i < field.size(); i++ ){
@@ -283,19 +308,16 @@ public:
 
         // output base change frequency
         ofs = fn+".base.frq";
-        this->printBaseChangeFrequncy(ofs.c_str());
+        this->printBaseChangeFrequency(ofs.c_str());
         fprintf(stdout, "DONE: Generated frequency of each base change in [ %s ].\n", ofs.c_str());
         LOG << "Generate frequency of each base change in " << ofs << " succeed!\n";
 
-        //TODO
         // output codon change frequency
-/*
         ofs = fn+".codon.frq";
-        this->printAnnotationFrequency(ofs.c_str());
+        this->printCodonChangeFrequency(ofs.c_str());
         fprintf(stdout, "DONE: Generated frequency of each codon change in [ %s ].\n", ofs.c_str());
         LOG << "Generate frequency of each codon change in " << ofs << " succeed!\n";
-*/
-        //TODO (fix this!)
+
         // output indel length frequency
         ofs = fn+".indel.frq";
         this->printIndelLengthFrequency(ofs.c_str());
@@ -319,7 +341,7 @@ public:
         }
         fclose(fp);
     };
-    void printBaseChangeFrequncy(const char* fileName){
+    void printBaseChangeFrequency(const char* fileName){
         FILE* fp = fopen(fileName, "wt");
         assert(fp);
         unsigned int n = this->baseFreq.size();
@@ -327,6 +349,18 @@ public:
             std::string k;
             int count;
             this->baseFreq.at(i, &k, &count);
+            fprintf(fp, "%s\t%d\n", k.c_str(), count);
+        }
+        fclose(fp);
+    };
+    void printCodonChangeFrequency(const char* fileName){
+        FILE* fp = fopen(fileName, "wt");
+        assert(fp);
+        unsigned int n = this->codonFreq.size();
+        for (unsigned int i = 0; i < n; i++){
+            std::string k;
+            int count;
+            this->codonFreq.at(i, &k, &count);
             fprintf(fp, "%s\t%d\n", k.c_str(), count);
         }
         fclose(fp);
@@ -704,6 +738,8 @@ private:
                             s += altAAName;
                             s += WITHIN_GENE_RIGHT_DELIM;
                             this->geneAnnotation.addDetail(s);
+                            // record frequency
+                            this->codonFreq.add(refAAName+"->"+altAAName);
                         } else {
                             this->geneAnnotation.add(SNV);
                         }
@@ -738,42 +774,28 @@ private:
      *
      */
     void annotateByGene(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
+                        const VARIATION_TYPE& type,
                         std::string* annotationString){
         assert(annotationString);
         annotationString->clear();
         this->geneAnnotation.clear();
-        // check VARATION_TYPE 
-        // and record frequency
-        switch(determineVariationType(ref, alt)) {
+        switch(type) {
         case SNP:
             this->annotateSNP(geneIdx, chr, variantPos, ref, alt);
-            this->baseFreq.add(ref + "->" +alt);
             break;
         case INS:
             this->annotateIns(geneIdx, chr, variantPos, ref, alt);
-            this->indelLengthFreq.add(calculateIndelLength(ref, alt));
             break;
         case DEL:
             this->annotateDel(geneIdx, chr, variantPos, ref, alt);
-            this->indelLengthFreq.add(calculateIndelLength(ref, alt));
-            break;
-        case MIXED:
-            if (this->allowMixedVariation) {
-                // annotate multiple gene
-                // to finished.
-            } else {
-                // only annotate the first variation
-                std::string singleAlt = alt;
-                int commaPos = alt.find(',');
-                singleAlt = alt.substr(0, commaPos);
-                this->annotateByGene(geneIdx, chr, variantPos, ref, singleAlt, annotationString);
-            };
             break;
         case SV:
             this->annotateSV(geneIdx, chr, variantPos, ref, alt);
             break;
+        case MIXED:
         case UNKNOWN:
         default:
+            LOG << "Currently we don't support this variation type: " << type << "\n";
             break;
         };
 
@@ -836,7 +858,7 @@ private:
 
     AnnotationResult geneAnnotation;
     FreqTable<std::string> baseFreq;           // base change frequency
-    // FreqTable<std::string> codonFreq;          // codon change frequency
+    FreqTable<std::string> codonFreq;          // codon change frequency
     FreqTable<int> indelLengthFreq; // for insertion, the value is positive; for deletion, positive
 };
 

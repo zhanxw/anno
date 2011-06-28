@@ -24,7 +24,7 @@ public:
     // return the frequency in ascending order
     void at(const unsigned int idx, T* t, int* v) {
         if (!this->isSorted) 
-            this->sort();
+            this->sortByFrequency();
         *v = this->orderedData[idx].first;
         *t = *(this->orderedData[idx].second);
     };
@@ -34,14 +34,18 @@ public:
         this->isSorted = false;
     };
 private:
-    void sort() {
+    void sortByFrequency() {
+        this->sortByKey();
+        std::sort(this->orderedData.begin(), this->orderedData.end());
+        this->isSorted = true;
+    };
+    void sortByKey() {
         this->orderedData.clear();
         typename std::map<T, int >::iterator it;
         for (it = this->data.begin(); 
              it != this->data.end() ; it++) {
             this->orderedData.push_back(std::make_pair( (*it).second, &((*it).first)) );
         }
-        std::sort(this->orderedData.begin(), this->orderedData.end());
         this->isSorted = true;
     };
     std::map< T, int > data;
