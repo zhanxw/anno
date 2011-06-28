@@ -199,7 +199,13 @@ class Gene{
         }
         return false;
     };
+    /**
+     * @return the position of the codon right next to @param currentPos,
+     * @param cdsIdx indicates which codon (1, 2, 3..) is the @param currentPos
+     * @param offset indicate the calculated position is on the left or right
+     */
     int nextCodonPos(const int currentPos, int* cdsIdx, const int offset) {
+        if (currentPos < 0) return -1;
         assert (offset == 1 || offset == -1);
         int nextPos = -1;
         if (offset == 1) {
