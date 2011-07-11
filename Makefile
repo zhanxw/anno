@@ -14,8 +14,8 @@ Main: Main.cpp Gene.h Range.h IO.h Argument.h FreqTable.h
 clean:
 	rm -f *.o Main
 test1: debug
-	./Main -i test.vcf -r test.fa -g test.gene.txt -o test.out.vcf
+	./Main -i test.vcf -r test.fa -g test.gene.txt -c codon.txt -o test.out.vcf
 test2: debug
-	./Main -i 100.vcf.gz -r test.fa -g refFlat_hg19.txt.gz -o 100.out.vcf
+	./Main -i 100.vcf.gz -r test.fa -g refFlat_hg19.txt.gz -c codon.txt -o 100.out.vcf
 Log: LogFile.cpp LogFile.h
 	g++ -g -o $@ $<

@@ -198,7 +198,11 @@ public:
         return;
     };
     void openCodonFile(const char* codonFileName) {
+        fprintf(stdout, "Load codon file %s...\n", codonFileName);
         this->codon.open(codonFileName);
+        fprintf(stdout, "DONE: codon file loaded.\n");
+        LOG << "Codon file " << codonFileName << " loads succeed!\n";
+        return;
     };
     void openReferenceGenome(const char* referenceGenomeFileName) {
         fprintf(stdout, "Load reference genome %s...\n", referenceGenomeFileName);
@@ -873,6 +877,7 @@ int main(int argc, char *argv[])
         ADD_PARAMETER_GROUP(pl, "Optional Parameters")
         ADD_STRING_PARAMETER(pl, referenceFile, "-r", "Specify reference genome position")
         ADD_STRING_PARAMETER(pl, geneFileFormat, "-f", "Specify gene file format (default: refFlat, other options knownGene)")
+        ADD_STRING_PARAMETER(pl, codonFile, "-c", "Specify codon file (default: codon.txt)")
         ADD_INT_PARAMETER(pl, upstreamRange, "-u", "Specify upstream range (default: 50)")
         ADD_INT_PARAMETER(pl, downstreamRange, "-d", "Specify downstream range (default: 50)")
         ADD_INT_PARAMETER(pl, spliceIntoExon, "--se", "Specify splice into extron range (default: 3)")
@@ -917,7 +922,7 @@ int main(int argc, char *argv[])
     ga.setAnnotationParameter(param);
     if (FLAG_referenceFile.size() != 0) {
         ga.openReferenceGenome(FLAG_referenceFile.c_str());
-        ga.openCodonFile("codon.txt");
+        ga.openCodonFile(FLAG_codonFile.c_str());
     }
 
     ga.setFormat(FLAG_geneFileFormat);
