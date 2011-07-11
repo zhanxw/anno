@@ -866,11 +866,17 @@ int main(int argc, char *argv[])
     banner(stdout);
 
     BEGIN_PARAMETER_LIST(pl)
+        ADD_PARAMETER_GROUP(pl, "Required Parameters")
         ADD_STRING_PARAMETER(pl, inputFile, "-i", "Specify input VCF file")
         ADD_STRING_PARAMETER(pl, outputFile, "-o", "Specify output VCF file")
         ADD_STRING_PARAMETER(pl, geneFile, "-g", "Specify gene file")
+        ADD_PARAMETER_GROUP(pl, "Optional Parameters")
         ADD_STRING_PARAMETER(pl, referenceFile, "-r", "Specify reference genome position")
         ADD_STRING_PARAMETER(pl, geneFileFormat, "-f", "Specify gene file format (default: refFlat, other options knownGene)")
+        ADD_INT_PARAMETER(pl, upstreamRange, "-u", "Specify upstream range (default: 50)")
+        ADD_INT_PARAMETER(pl, downstreamRange, "-d", "Specify downstream range (default: 50)")
+        ADD_INT_PARAMETER(pl, spliceIntoExon, "--se", "Specify splice into extron range (default: 3)")
+        ADD_INT_PARAMETER(pl, spliceIntoIntron, "--si", "Specify splice into intron range (default: 8)")
         END_PARAMETER_LIST(pl)
         ;
 
@@ -895,6 +901,12 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    GeneAnnotationParam param;
+    param.upstreamRange = FLAG_upstreamRange ? FLAG_upstreamRange : 50;
+    param.downstreamRange = FLAG_downstreamRange ? FLAG_downstreamRange : 50;
+    param.spliceIntoExon = FLAG_spliceIntoExon ? FLAG_spliceIntoExon : 3;
+    param.spliceIntoIntron = FLAG_spliceIntoIntron ? FLAG_spliceIntoIntron : 8;
+
 #if 1
     std::string logFileName = FLAG_outputFile + ".log";
     LOG_START(logFileName.c_str());
@@ -902,6 +914,7 @@ int main(int argc, char *argv[])
     LOG_PARAMETER(pl);
     GeneAnnotation ga;
     pl.Status();
+    ga.setAnnotationParameter(param);
     if (FLAG_referenceFile.size() != 0) {
         ga.openReferenceGenome(FLAG_referenceFile.c_str());
         ga.openCodonFile("codon.txt");
