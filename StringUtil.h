@@ -105,4 +105,16 @@ std::string chopChr(const std::string& s) {
     return s;
 };
 
+char _bufferStr[128];
+// convert number to char*
+const char* toStr(const int i) {
+    sprintf(_bufferStr, "%d", i);
+    return _bufferStr;
+};
+const char* toStr(const double d) {
+    sprintf(_bufferStr, "%lf", d);
+    return _bufferStr;
+};
+
+
 #endif /* _STRINGUTIL_H_ */
