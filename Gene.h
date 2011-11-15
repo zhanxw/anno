@@ -232,6 +232,8 @@ class Gene{
     /**
      * @return true: if codonPos[3] are all valid position
      * @param codonNum : which base (inclusive, 1-based) has mutation
+     *        e.g. codonNum = 5 meaning if we concatenate all codon together
+     *        the mutation is in the 5th position, the 2rd codon.
      */
     bool calculateCodonPosition(const int variantPos, int* codonNum, int codonPos[3]){
         *codonNum = 0;
@@ -390,9 +392,16 @@ class Gene{
         return (this->isInRange(pos, r.start, r.end));
     };
     bool isInRange(const int pos, const std::vector<Range>& r) {
+        int idx;
+        return this->isInRange(pos, r, &idx);
+    };
+    bool isInRange(const int pos, const std::vector<Range>& r, int* rangeIdx) {
+        *rangeIdx = -1;
         for (unsigned int i = 0; i < r.size(); i++) {
-            if (this->isInRange(pos, r[i]))
+            if (this->isInRange(pos, r[i])){
+                *rangeIdx = i;
                 return true;
+            }
         }
         return false;
     };

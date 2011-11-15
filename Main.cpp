@@ -733,6 +733,12 @@ private:
                             s += refTriplet[2];
                             s += "/";
                             s += refAAName;
+                            s += '/';
+                            // quick patch about codon number
+                            char buf[128];
+                            sprintf(buf, "[Codon%d/%d]", 
+                                    codonNum + 1, g.getCDSLength());
+                            s += buf;
                             s += "->";
                             s += altTriplet[0];
                             s += altTriplet[1];
