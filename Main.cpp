@@ -486,7 +486,7 @@ private:
             this->geneAnnotation.add(DOWNSTREAM);
         } else if (g.isExon(variantPos, &exonNum)){//, &codonNum, codonPos)) {
             this->geneAnnotation.add(EXON);
-            if (!g.isNonCoding()) {
+            if (g.isCoding()) {
                 if (g.is5PrimeUtr(variantPos, &utrPos, &utrLen)) {
                     this->geneAnnotation.add(UTR5);
                 } else if (g.is3PrimeUtr(variantPos, &utrPos, &utrLen)) {
@@ -702,7 +702,7 @@ private:
             this->geneAnnotation.add(DOWNSTREAM);
         } else if (g.isExon(variantPos, &exonNum)){//, &codonNum, codonPos)) {
             this->geneAnnotation.add(EXON);
-            if (!g.isNonCoding()) {
+            if (g.isCoding()) {
                 if (g.is5PrimeUtr(variantPos, &utrPos, &utrLen)) {
                     this->geneAnnotation.add(UTR5);
                 } else if (g.is3PrimeUtr(variantPos, &utrPos, &utrLen)) {
@@ -745,6 +745,16 @@ private:
                             s += altTriplet[2];
                             s += "/";
                             s += altAAName;
+                            s += WITHIN_GENE_SEPARATOR;
+                            s += "Codon";
+                            s += toStr( (codonNum + 2) / 3 );
+                            s += "/";
+                            s += toStr(g.getCDSLength() / 3);
+                            s += WITHIN_GENE_SEPARATOR;
+                            s += "Exon";
+                            s += toStr(exonNum + 1); // convert 0 indexed to 1 indexed
+                            s += "/";
+                            s += toStr( (int)( g.exon.size()));
                             s += WITHIN_GENE_RIGHT_DELIM;
                             this->geneAnnotation.addDetail(s);
                             // record frequency

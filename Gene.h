@@ -53,13 +53,8 @@ class Gene{
             this->exon.push_back(Range(toInt(exon_beg[i]) + 1, toInt(exon_end[i])));
         }
         if (!this->isNonCodingGene) {
-            // we will assume this is forward strand
-            // if this is not the case, we will swap utr5 and utr3
-
-            /* if (name == "TMEM88B") { */
-            /*     printf("\n"); */
-            /* } */
-            
+            // we will load utr5 and utr3, at the last step, we will
+            // swap them for reverse strand
             // load till left of cdsBegin
             unsigned i = 0;
             for (i = 0; i < nExon; i++ ){
@@ -180,8 +175,14 @@ class Gene{
         return false;
     };
     bool isExon(const int variantPos, int* exonNum){
+        bool ret = this->isInRange(variantPos, this->exon, exonNum);
+        if (ret && !this->forwardStrand){
+            *exonNum = this->exon.size() - 1 - *exonNum; // e.g. exonNum = 0 and exon.size() = 5, then we should get exonNum = 4
+        }
+        return ret;
+        /*
         if (isNonCoding()) {
-            if (this->isInRange(variantPos, this->exon))
+            if (this->isInRange(variantPos, this->exon, exonNum))
                 return true;
         } else {
             if (this->isInRange(variantPos, this->utr5) || 
@@ -190,6 +191,7 @@ class Gene{
                 return true;
         }
         return false;
+        */
     };
     bool isCodingRegion(const int variantPos, int* codonNum){
         if (isNonCoding())
@@ -231,7 +233,7 @@ class Gene{
     };
     /**
      * @return true: if codonPos[3] are all valid position
-     * @param codonNum : which base (inclusive, 1-based) has mutation
+     * @param codonNum : which base (inclusive, 1-based) has mutation. possible values: 1, 2, 3 ...
      *        e.g. codonNum = 5 meaning if we concatenate all codon together
      *        the mutation is in the 5th position, the 2rd codon.
      */
@@ -370,12 +372,8 @@ class Gene{
     bool isNonCoding() {
         return this->isNonCodingGene;
     };
-    /**
-     * given @param variantPos, @param exonNum (which exon the variantPos lies),
-     * @param codonNum (how many bases from the begining of cds to 
-     */
-    void calculateCodonPos(int exonNum, int codonNum, int variantPos, int codonPos[3]) {
-        
+    bool isCoding() {
+        return !this->isNonCodingGene;
     };
     /**
      * @return true if @param pos is in the range [@param beg, @param end] (inclusive on the boundaries).
@@ -395,14 +393,19 @@ class Gene{
         int idx;
         return this->isInRange(pos, r, &idx);
     };
-    bool isInRange(const int pos, const std::vector<Range>& r, int* rangeIdx) {
-        *rangeIdx = -1;
+    /**
+     * Check if @param pos is in the range (@param r), and put the index to @param whichRange
+     * so that @param pos is within @param r [ @param whichRange]
+     */
+    bool isInRange(const int pos, const std::vector<Range>& r, int* whichRange) {
+        assert(whichRange);
         for (unsigned int i = 0; i < r.size(); i++) {
             if (this->isInRange(pos, r[i])){
-                *rangeIdx = i;
+                *whichRange = i;
                 return true;
             }
         }
+        *whichRange = -1;
         return false;
     };
     /**
