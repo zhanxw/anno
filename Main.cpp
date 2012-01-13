@@ -65,7 +65,7 @@ typedef enum {
     CODON_GAIN,             /* Insertion length is divisible by 3 */
     CODON_LOSS,             /* Deletion length is divisible by 3 */
     CODON_REGION,           /* Just say the variant is in the Coding Region, used in Structrual Varition*/
-    INTROGENIC,
+    INTERGENIC,
     NONCODING
 } AnnotationType;
 
@@ -92,18 +92,18 @@ const char* AnnotationString[]= {
     "CodonGain",
     "CodonLoss",
     "CodonRegion",
-    "Introgenic",
+    "Intergenic",
     "Noncoding"
 };
 
 
 // here we define format or the annotation.
-#define FORWARD_STRAND_STRING "(+)"
-#define REVERSE_STRAND_STRING "(-)"
+#define FORWARD_STRAND_STRING "+"
+#define REVERSE_STRAND_STRING "-"
 #define INFO_SEPARATOR ';'
 #define ANNOTATION_START_TAG "ANNO="
-#define GENE_SEPARATOR ':'
-#define WITHIN_GENE_SEPARATOR '|'
+#define GENE_SEPARATOR '|'
+#define WITHIN_GENE_SEPARATOR ':'
 #define WITHIN_GENE_LEFT_DELIM '('
 #define WITHIN_GENE_RIGHT_DELIM ')'
 
@@ -125,7 +125,7 @@ public:
         // annotationString->push_back(WITHIN_GENE_SEPARATOR);
         // *annotationString+=(stringJoin(annotation, WITHIN_GENE_SEPARATOR));
 
-        return stringJoin(this->data, GENE_SEPARATOR);
+        return stringJoin(this->data, WITHIN_GENE_SEPARATOR);
     };
     void add(const Gene& g){
         if (this->data.size() != 0) {
@@ -251,7 +251,7 @@ public:
             // find near target genes
             std::vector<unsigned> potentialGeneIdx;
             this->findInRangeGene(field[0], &pos, &potentialGeneIdx);
-            // if Introgenic,  we will have (potentialGeneIdx.size() == 0)
+            // if Intergenic,  we will have (potentialGeneIdx.size() == 0)
             annotationString.clear();
             geneAnnotation.clear();
             // determine variation type
@@ -288,7 +288,7 @@ public:
                     if (annotationString.size() == 0) {
                         //intergenic
                         fputs(ANNOTATION_START_TAG, fout);
-                        fputs(AnnotationString[INTROGENIC], fout);
+                        fputs(AnnotationString[INTERGENIC], fout);
                     } else {
                         fputs(ANNOTATION_START_TAG, fout);
                         fputs(stringJoin(annotationString, GENE_SEPARATOR).c_str(), fout);
