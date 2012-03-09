@@ -23,6 +23,13 @@ public:
         key.push_back(s[2]);
         return safeAccess(this->codon2aa, key, Codon::unknownAA);
     };
+    const std::string& toLetter(const char s[3]) {
+        std::string key;
+        key.push_back(s[0]);
+        key.push_back(s[1]);
+        key.push_back(s[2]);
+        return safeAccess(this->codon2letter, key, Codon::unknownLetter);
+    };
 public:
     static bool isStopCodon(const std::string& a) {
         if (a == "Stp") return true;

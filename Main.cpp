@@ -713,6 +713,8 @@ private:
                         char altTriplet[3];
                         std::string refAAName;
                         std::string altAAName;
+                        std::string refLetterName;
+                        std::string altLetterName;
                         AnnotationType annotationType;
                         // when reference genome is provided
                         if (this->gs.size() >0){
@@ -723,6 +725,8 @@ private:
                             };
                             refAAName = this->codon.toAA(refTriplet);
                             altAAName = this->codon.toAA(altTriplet);
+                            refLetterName = this->codon.toLetter(refTriplet);
+                            altLetterName = this->codon.toLetter(altTriplet);
                             annotationType = this->determineSNVType(refAAName, altAAName, codonNum);
 
                             this->geneAnnotation.add(annotationType);
@@ -733,21 +737,25 @@ private:
                             s += refTriplet[2];
                             s += "/";
                             s += refAAName;
-                            s += '/';
-                            // quick patch about codon number
-                            char buf[128];
-                            sprintf(buf, "[Codon%d/%d]", 
-                                    codonNum + 1, g.getCDSLength());
-                            s += buf;
+                            s += "/";
+                            s += refLetterName;
                             s += "->";
                             s += altTriplet[0];
                             s += altTriplet[1];
                             s += altTriplet[2];
                             s += "/";
                             s += altAAName;
+                            s += "/";
+                            s += altLetterName;
+                            s += WITHIN_GENE_SEPARATOR;
+                            // quick patch about codon number
+                            char buf[128];
+                            sprintf(buf, "Base%d/%d", 
+                                    codonNum + 1, g.getCDSLength());
+                            s += buf;
                             s += WITHIN_GENE_SEPARATOR;
                             s += "Codon";
-                            s += toStr( (codonNum + 2) / 3 );
+                            s += toStr( codonNum / 3 + 1 );
                             s += "/";
                             s += toStr(g.getCDSLength() / 3);
                             s += WITHIN_GENE_SEPARATOR;
@@ -921,7 +929,6 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Please specify gene file\n");
         exit(1);
     }
-
     GeneAnnotationParam param;
     param.upstreamRange = FLAG_upstreamRange ? FLAG_upstreamRange : 50;
     param.downstreamRange = FLAG_downstreamRange ? FLAG_downstreamRange : 50;
@@ -936,6 +943,10 @@ int main(int argc, char *argv[])
     GeneAnnotation ga;
     pl.Status();
     ga.setAnnotationParameter(param);
+    if (FLAG_codonFile.size() == 0) {
+        fprintf(stderr, "Use default codon file: /net/fantasia/home/zhanxw/anno/codon.txt\n");
+        FLAG_codonFile = "/net/fantasia/home/zhanxw/anno/codon.txt";
+    }
     if (FLAG_referenceFile.size() != 0) {
         ga.openReferenceGenome(FLAG_referenceFile.c_str());
         ga.openCodonFile(FLAG_codonFile.c_str());
