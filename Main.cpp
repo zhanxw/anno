@@ -102,6 +102,7 @@ const char* AnnotationString[]= {
 #define REVERSE_STRAND_STRING "-"
 #define INFO_SEPARATOR ';'
 #define ANNOTATION_START_TAG "ANNO="
+#define ANNOTATION_START_TAG_FULL "ANNOFULL="
 #define GENE_SEPARATOR '|'
 #define WITHIN_GENE_SEPARATOR ':'
 #define WITHIN_GENE_LEFT_DELIM '('
@@ -153,6 +154,7 @@ private:
     std::vector<std::string> data;
     FreqTable<AnnotationType> freq;
 };
+
 struct GeneAnnotationParam{
     GeneAnnotationParam():
         upstreamRange(50),
@@ -211,6 +213,77 @@ public:
         LOG << "Reference genome file " << referenceGenomeFileName << " loads succeed!\n";
         return;
     };
+    std::string squeezeAnnotation(std::vector<std::string> annotationString) {
+        // Load priority.txt
+        LineReader lr("../priority.txt");
+        std::vector<std::string> fd;
+        int priorityIdx = 0;
+        std::map<int, std::string> priorityInt2Type;
+        std::map<std::string, int> priorityType2Int;
+        while (lr.readLineBySep(&fd, " ")){
+            if (fd.size() == 0) continue;
+            if (fd[0][0] == '#') continue;
+            if (fd[0].size() == 0) continue;
+            priorityIdx ++;
+            priorityInt2Type[priorityIdx] = fd[0];
+            priorityType2Int[fd[0]] = priorityIdx;
+        }
+        fprintf(stderr, "%d priority annotation types loaded.\n", priorityIdx);
+        
+        // get gene name and type
+        std::string name;
+        std::string type;
+
+        std::map< int, std::vector<std::string> > all;
+        for (unsigned i = 0; i != annotationString.size(); i++){
+            int priority  = priorityIdx;
+            stringTokenize(annotationString[i], ":", &fd);
+            name = fd[0];
+            for (unsigned int j = 2; j < fd.size(); j++){
+                size_t ppos =  fd[j].find('(');
+                if (ppos == std::string::npos) {
+                    type = fd[j];
+                } else {
+                    type = fd[j].substr(0, ppos);
+                }
+
+                if (priorityType2Int.count(type) == 0 ) 
+                    continue;
+                if (priority > priorityType2Int[type]) {
+                    // fprintf(stderr, " old_priority = %d, new_priority = %d, new_type = %s\n", priority, priorityType2Int[type], type.c_str());
+                    priority =  priorityType2Int[type];
+                }
+            }
+            if (priority == priorityIdx) continue;
+            all[priority].push_back( name );
+            // fprintf(stderr, "insert gene %s with priority %d (%s).\n", name.c_str(), priority, priorityInt2Type[priority].c_str());
+        }
+
+        // output type + genes
+        int topIdx = 0; 
+        while (topIdx < priorityInt2Type.size()) {
+            if (all.count(topIdx) > 0) break;
+            topIdx ++;
+        };
+
+        std::string res;
+        if (topIdx >= priorityInt2Type.size()){
+            // cannot find any annotation
+            res = INTERGENIC;
+        } else{
+            // find highest priority annotation
+            // std::map< int, std::vector<std::string> >::iterator iter;
+            // for (iter = all.begin(); iter != all.end(); iter++){
+            //     // printf("%d -> %s\n", iter->first, (iter->second)[0].c_str());
+            // };
+            std::vector<std::string>& names = all[topIdx];
+            res = priorityInt2Type[topIdx];
+            res += WITHIN_GENE_SEPARATOR;
+            res += stringJoin(names, GENE_SEPARATOR);            
+        };
+
+        return res;
+    };
     // we take a VCF input file for now
     void annotate(const char* inputFileName, const char* outputFileName){
         // open output file
@@ -245,6 +318,7 @@ public:
                 // only annotate the first variation
                 int commaPos = alt.find(',');
                 singleAlt = alt.substr(0, commaPos);
+                alt = singleAlt;
                 type = determineVariationType(ref, alt);
             }
 
@@ -289,8 +363,14 @@ public:
                         //intergenic
                         fputs(ANNOTATION_START_TAG, fout);
                         fputs(AnnotationString[INTERGENIC], fout);
+                        fputc(INFO_SEPARATOR, fout);
+                        fputs(ANNOTATION_START_TAG_FULL, fout);
+                        fputs(AnnotationString[INTERGENIC], fout);
                     } else {
                         fputs(ANNOTATION_START_TAG, fout);
+                        fputs(squeezeAnnotation(annotationString).c_str(), fout);
+                        fputc(INFO_SEPARATOR, fout);
+                        fputs(ANNOTATION_START_TAG_FULL, fout);
                         fputs(stringJoin(annotationString, GENE_SEPARATOR).c_str(), fout);
                     }
                 }

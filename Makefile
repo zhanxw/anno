@@ -7,14 +7,14 @@ release: CXXFLAGS = -O2 $(DEFAULT_CXXFLAGS)
 release: $(EXEC)
 	-mkdir executable
 	cp -f $(EXEC) executable
-debug: CXXFLAGS = -g $(DEFAULT_CXXFLAGS)
+debug: CXXFLAGS = -ggdb -O0 $(DEFAULT_CXXFLAGS)
 debug: $(EXEC)
 
-anno: Main.cpp Gene.h Range.h IO.h Argument.h FreqTable.h
+$(EXEC): Main.cpp Gene.h Range.h IO.h Argument.h FreqTable.h
 	g++ $(CXXFLAGS) -c Main.cpp
 	g++ $(CXXFLAGS) -o $@ Main.o -lz -lbz2 -lssl -lcrypto
 clean:
-	rm -f *.o Main
+	rm -f *.o $(EXEC)
 test1: debug
 	(cd example; ../$(EXEC) -i test.vcf -r test.fa -g test.gene.txt -c ../codon.txt -o test.out.vcf)
 test2: debug

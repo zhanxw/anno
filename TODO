@@ -1,16 +1,19 @@
 TODO
 ====
-3. output statistics
 4. support various input formats (partly done on gene file)
-5. customized output
+   support GENCODE
 6. write a log file, parameter, start time, end time, how
    many gene, how many variant
+7. output site files for different category of annotation.
+   e.g. LOF file, NonSyn file...
+8. Support different terms: e.g missense, non-sense ... instead of synonymous, nonsynonymous
 
 MIGHT-DO
 ========
 1. vcfVersion checker 
 2. joining sift and polyphen-2.
 3. output format are configurable (user specify).
+5. customized output
 
 DONE
 ====
@@ -19,6 +22,7 @@ DONE
 6. Triplet -> AA consider reverse strand
 7. Support indel
 2. output to VCF format
+3. output statistics
 * 3. output basis statisitcs:
  *    freq of each annotation  .anno.freq
  *    freq of each base change .base.freq
