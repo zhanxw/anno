@@ -18,6 +18,8 @@ clean:
 test1: debug
 	(cd example; ../$(EXEC) -i test.vcf -r test.fa -g test.gene.txt -c ../codon.txt -o test.out.vcf)
 test2: debug
-	(cd example; ../$(EXEC) -i 100.vcf.gz -r test.fa -g refFlat_hg19.txt.gz -c ../codon.txt -o 100.out.vcf)
+	(cd example; ../$(EXEC) -i 100.vcf.gz -r test.fa -g ../resources/refFlat_hg19.txt.gz -c ../codon.txt -o 100.out.vcf)
+test3: debug
+	(cd example; ../$(EXEC) -i 100.vcf.gz -r ../resources/human.g1k.v37.fa -g ../resources/refFlat_hg19.txt.gz -c ../codon.txt -o 100.out.vcf)
 Log: LogFile.cpp LogFile.h
 	g++ -g -o $@ $<

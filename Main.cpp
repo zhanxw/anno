@@ -110,6 +110,26 @@ const char* AnnotationString[]= {
 
 struct Priority{
 public:
+    int open(const char* fileName) {
+        // Load priority.txt
+        this->priorityIdx = 0;
+        this->priorityInt2Type.clear();
+        this->priorityType2Int.clear();
+        LineReader lr(fileName);
+        std::vector<std::string> fd;
+
+        while (lr.readLineBySep(&fd, " \t")){
+            if (fd.size() == 0) continue;
+            if (fd[0][0] == '#') continue;
+            if (fd[0].size() == 0) continue;
+            priorityIdx ++;
+            // fprintf(stderr, "add priority [%s]\n", fd[0].c_str());
+            priorityInt2Type[priorityIdx] = fd[0];
+            priorityType2Int[fd[0]] = priorityIdx;
+        }
+        return priorityIdx;
+    };
+public:
     int priorityIdx;
     std::map<int, std::string> priorityInt2Type;
     std::map<std::string, int> priorityType2Int;
@@ -220,28 +240,13 @@ public:
         LOG << "Reference genome file " << referenceGenomeFileName << " loads succeed!\n";
         return;
     };
-    
-    void loadPriority(const char* fileName, Priority* p) {
-        int& priorityIdx = p->priorityIdx;
-        std::map<int, std::string>& priorityInt2Type = p->priorityInt2Type;
-        std::map<std::string, int>& priorityType2Int = p->priorityType2Int;
-
-        // Load priority.txt
-        LineReader lr(fileName);
-        std::vector<std::string> fd;
-
-        while (lr.readLineBySep(&fd, " \t")){
-            if (fd.size() == 0) continue;
-            if (fd[0][0] == '#') continue;
-            if (fd[0].size() == 0) continue;
-            priorityIdx ++;
-            // fprintf(stderr, "add priority [%s]\n", fd[0].c_str());
-            priorityInt2Type[priorityIdx] = fd[0];
-            priorityType2Int[fd[0]] = priorityIdx;
-        }
-        fprintf(stderr, "%d priority annotation types loaded.\n", priorityIdx);
+    void openPriorityFile(const char* fileName) {
+        fprintf(stdout, "Load priority file %s...\n", fileName);
+        int ret = this->priority.open(fileName);
+        fprintf(stderr, "DONE: %d priority annotation types loaded.\n", ret);
+        LOG << "Priority file " << fileName << " load succeed!\n";
+        return;
     };
-
     std::string squeezeAnnotation(std::vector<std::string> annotationString, const Priority& p) {
         const int& priorityIdx = p.priorityIdx;
         const std::map<int, std::string>& priorityInt2Type = p.priorityInt2Type;
@@ -302,9 +307,8 @@ public:
     };
     // we take a VCF input file for now
     void annotate(const char* inputFileName, const char* outputFileName){
-        // load priority list
-        Priority priority;
-        loadPriority("/net/fantasia/home/zhanxw/anno/priority.txt", &priority);
+        // // load priority list
+        // this->openPriorityFile(inputFileName);
 
         // open output file
         FILE* fout = fopen(outputFileName, "wt");
@@ -980,6 +984,7 @@ private:
     std::string annotation;
     GenomeSequence gs;
     Codon codon;
+    Priority priority;
     GeneFormat format;
     bool allowMixedVariation;       // VCF ALT field may have more than one variation e..g A,C
 
@@ -987,7 +992,7 @@ private:
     FreqTable<std::string> baseFreq;           // base change frequency
     FreqTable<std::string> codonFreq;          // codon change frequency
     FreqTable<int> indelLengthFreq; // for insertion, the value is positive; for deletion, positive
-};
+}; // end class GeneAnnotation
 
 int main(int argc, char *argv[])
 {
@@ -1001,6 +1006,7 @@ int main(int argc, char *argv[])
         ADD_PARAMETER_GROUP(pl, "Optional Parameters")
         ADD_STRING_PARAMETER(pl, referenceFile, "-r", "Specify reference genome position")
         ADD_STRING_PARAMETER(pl, geneFileFormat, "-f", "Specify gene file format (default: refFlat, other options knownGene)")
+        ADD_STRING_PARAMETER(pl, priorityFile, "-p", "Specify priority of annotations")
         ADD_STRING_PARAMETER(pl, codonFile, "-c", "Specify codon file (default: codon.txt)")
         ADD_INT_PARAMETER(pl, upstreamRange, "-u", "Specify upstream range (default: 50)")
         ADD_INT_PARAMETER(pl, downstreamRange, "-d", "Specify downstream range (default: 50)")
@@ -1043,14 +1049,23 @@ int main(int argc, char *argv[])
     GeneAnnotation ga;
     pl.Status();
     ga.setAnnotationParameter(param);
+
+    if (FLAG_priorityFile.size() == 0) {
+        fprintf(stderr, "Use default priority file: /net/fantasia/home/zhanxw/anno/priority.txt\n");
+        FLAG_priorityFile = "/net/fantasia/home/zhanxw/anno/priority.txt";
+    };
     if (FLAG_codonFile.size() == 0) {
         fprintf(stderr, "Use default codon file: /net/fantasia/home/zhanxw/anno/codon.txt\n");
         FLAG_codonFile = "/net/fantasia/home/zhanxw/anno/codon.txt";
     }
-    if (FLAG_referenceFile.size() != 0) {
-        ga.openReferenceGenome(FLAG_referenceFile.c_str());
-        ga.openCodonFile(FLAG_codonFile.c_str());
-    }
+    if (FLAG_referenceFile.size() == 0) {
+        fprintf(stderr, "Use default codon file: /net/fantasia/home/zhanxw/anno/codon.txt\n");
+        FLAG_referenceFile = "/data/local/ref/karma.ref/human.g1k.v37.fa";
+    } 
+
+    ga.openReferenceGenome(FLAG_referenceFile.c_str());
+    ga.openCodonFile(FLAG_codonFile.c_str());
+    ga.openPriorityFile(FLAG_priorityFile.c_str());
 
     ga.setFormat(FLAG_geneFileFormat);
     ga.openGeneFile(FLAG_geneFile.c_str());
