@@ -27,7 +27,7 @@ void banner(FILE* fp) {
         "  ...      Xiaowei Zhan, Goncalo Abecasis     ...    \n"
         "   ...      zhanxw@umich.edu                    ...  \n"
         "    ...      Jun 2011                            ... \n"
-        "     ................................................\n" 
+        "     ................................................\n"
         "                                                     \n"
         ;
     fputs(string, fp);
@@ -251,7 +251,7 @@ public:
         const int& priorityIdx = p.priorityIdx;
         const std::map<int, std::string>& priorityInt2Type = p.priorityInt2Type;
         const std::map<std::string, int>& priorityType2Int = p.priorityType2Int;
-        
+
         // get gene name and type
         std::vector<std::string> fd;
         std::map< int, std::vector<std::string> > all;
@@ -268,7 +268,7 @@ public:
                     type = fd[j].substr(0, ppos);
                 }
 
-                if (priorityType2Int.count(type) == 0 ) 
+                if (priorityType2Int.count(type) == 0 )
                     continue;
                 if (priority > priorityType2Int.find(type)->second) {
                     // fprintf(stderr, " old_priority = %d, new_priority = %d, new_type = %s\n", priority, priorityType2Int[type], type.c_str());
@@ -281,7 +281,7 @@ public:
         }
 
         // output type + genes
-        int topIdx = 0; 
+        int topIdx = 0;
         while (topIdx < priorityInt2Type.size()) {
             if (all.count(topIdx) > 0) break;
             topIdx ++;
@@ -300,23 +300,18 @@ public:
             std::vector<std::string>& names = all[topIdx];
             res = priorityInt2Type.find(topIdx)->second;
             res += WITHIN_GENE_SEPARATOR;
-            res += stringJoin(names, GENE_SEPARATOR);            
+            res += stringJoin(names, GENE_SEPARATOR);
         };
 
         return res;
     };
-    // we take a VCF input file for now
-    void annotate(const char* inputFileName, const char* outputFileName){
-        // // load priority list
-        // this->openPriorityFile(inputFileName);
-
+    void annotateVCF(const char* inputFileName, const char* outputFileName){
         // open output file
         FILE* fout = fopen(outputFileName, "wt");
         assert(fout);
 
         // open input file
         std::vector<std::string> annotationString;
-        std::string geneAnnotation;
         LineReader lr(inputFileName);
         std::vector<std::string> field;
         std::string line;
@@ -328,52 +323,16 @@ public:
                 continue;
             }
             stringTokenize(line, "\t", &field);
-            if (field.size() < 4) continue;
+            if (field.size() < 5) continue;
             totalVariants++;
             std::string chr = field[0];
             int pos = toInt(field[1]);
             std::string ref = toUpper(field[3]);
             std::string alt = toUpper(field[4]);
 
-            // check VARATION_TYPE 
-            std::string singleAlt = alt;
-            VARIATION_TYPE type = determineVariationType(ref, alt);
-            if (type == MIXED) {
-                // only annotate the first variation
-                int commaPos = alt.find(',');
-                singleAlt = alt.substr(0, commaPos);
-                alt = singleAlt;
-                type = determineVariationType(ref, alt);
-            }
+            // real part of annotation
+            annotate(chr, pos, ref, alt, &annotationString);
 
-            // find near target genes
-            std::vector<unsigned> potentialGeneIdx;
-            this->findInRangeGene(field[0], &pos, &potentialGeneIdx);
-            // if Intergenic,  we will have (potentialGeneIdx.size() == 0)
-            annotationString.clear();
-            geneAnnotation.clear();
-            // determine variation type
-            
-            for (unsigned int i = 0; i < potentialGeneIdx.size(); i++) {
-                this->annotateByGene(potentialGeneIdx[i], chr, pos, ref, alt, type, &geneAnnotation);
-                annotationString.push_back(geneAnnotation);
-                // printf("%s %d ref=%s alt=%s has annotation: %s\n",
-                //        chr.c_str(), pos,
-                //        ref.c_str(), alt.c_str(),
-                //        annotationString.c_str());
-            }
-            // record frquency info
-            switch (type) {
-            case SNP:
-                this->baseFreq.add(ref + "->" +alt);
-                break;
-            case INS:
-            case DEL:
-                this->indelLengthFreq.add(calculateIndelLength(ref, alt));
-            default:
-                break;
-            }
-            
             // output annotation result
             // VCF info field is the 8th column
             for (unsigned int i = 0; i < field.size(); i++ ){
@@ -405,7 +364,65 @@ public:
         fclose(fout);
         fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
         LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
-        
+
+        // output stats
+        this->outputAnnotationStats(outputFileName);
+    }
+    void annotatePlain(const char* inputFileName, const char* outputFileName){
+        // open output file
+        FILE* fout = fopen(outputFileName, "wt");
+        assert(fout);
+
+        // open input file
+        std::vector<std::string> annotationString;
+        LineReader lr(inputFileName);
+        std::vector<std::string> field;
+        std::string line;
+        int totalVariants = 0;
+        while(lr.readLine(&line) > 0) {
+            if (line.size() == 0 || line[0] == '#') {
+                fputs(line.c_str(), fout);
+                fputc('\n', fout);
+                continue;
+            }
+            stringTokenize(line, "\t", &field);
+            if (field.size() < 4) continue;
+            totalVariants++;
+            std::string chr = field[0];
+            int pos = toInt(field[1]);
+            std::string ref = toUpper(field[2]);
+            std::string alt = toUpper(field[3]);
+
+            // real part of annotation
+            annotate(chr, pos, ref, alt, &annotationString);
+
+            // output annotation result
+            // VCF info field is the 8th column
+            for (unsigned int i = 0; i < field.size(); i++ ){
+                fputs(field[i].c_str(), fout) ;
+                fputs("\t", fout);
+            }
+            if (annotationString.size() == 0) {
+                //intergenic
+                fputs(AnnotationString[INTERGENIC], fout);
+                fputs("\t", fout);
+                fputs(AnnotationString[INTERGENIC], fout);
+            } else {
+                fputs(squeezeAnnotation(annotationString, priority).c_str(), fout);
+                fputs("\t", fout);
+                fputs(stringJoin(annotationString, GENE_SEPARATOR).c_str(), fout);
+            }
+            fputc('\n', fout);
+        }
+        // close output
+        fclose(fout);
+        fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
+        LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
+
+        // output stats
+        this->outputAnnotationStats(outputFileName);
+    }
+    void outputAnnotationStats(const char* outputFileName) {
         // output frequency files
         std::string fn = outputFileName;
         // output annotation frequency
@@ -431,7 +448,51 @@ public:
         this->printIndelLengthFrequency(ofs.c_str());
         fprintf(stdout, "DONE: Generated frequency of indel length in [ %s ].\n", ofs.c_str());
         LOG << "Generate frequency of indel length in " << ofs << " succeed!\n";
+    };
+    // we take a VCF input file for now
+    void annotate(const std::string& chrom,
+                  const int pos,
+                  const std::string& ref,
+                  const std::string& altParam,
+                  std::vector<std::string>* annotationString) {
+        // check VARATION_TYPE
+        std::string alt = altParam;
+        VARIATION_TYPE type = determineVariationType(ref, alt);
+        if (type == MIXED) {
+            // only annotate the first variation
+            int commaPos = alt.find(',');
+            alt = altParam.substr(0, commaPos);
+            type = determineVariationType(ref, alt);
+        }
 
+        // find near target genes
+        std::vector<unsigned> potentialGeneIdx;
+        this->findInRangeGene(chrom, pos, &potentialGeneIdx);
+        // if Intergenic,  we will have (potentialGeneIdx.size() == 0)
+        annotationString->clear();
+        std::string geneAnnotation;
+
+        // determine variation type
+        for (unsigned int i = 0; i < potentialGeneIdx.size(); i++) {
+            geneAnnotation.clear();
+            this->annotateByGene(potentialGeneIdx[i], chrom, pos, ref, alt, type, &geneAnnotation);
+            annotationString->push_back(geneAnnotation);
+            // printf("%s %d ref=%s alt=%s has annotation: %s\n",
+            //        chr.c_str(), pos,
+            //        ref.c_str(), alt.c_str(),
+            //        annotationString.c_str());
+        }
+        // record frquency info
+        switch (type) {
+        case SNP:
+            this->baseFreq.add(ref + "->" +alt);
+            break;
+        case INS:
+        case DEL:
+            this->indelLengthFreq.add(calculateIndelLength(ref, alt));
+        default:
+            break;
+        }
         return;
     };
     void setAnnotationParameter(GeneAnnotationParam& param) {
@@ -495,7 +556,7 @@ private:
     };
     // store results in @param potentialGeneIdx
     // find gene whose range plus downstream/upstream overlaps chr:pos
-    void findInRangeGene(const std::string& chr, int* pos, std::vector<unsigned int>* potentialGeneIdx) {
+    void findInRangeGene(const std::string& chr, const int pos, std::vector<unsigned int>* potentialGeneIdx) {
         assert(potentialGeneIdx);
         potentialGeneIdx->clear();
 
@@ -505,7 +566,7 @@ private:
             return;
         }
         int maxDist = (param.upstreamRange > param.downstreamRange) ? param.upstreamRange : param.downstreamRange;
-        Range r ((*pos - maxDist), (*pos + maxDist));
+        Range r ((pos - maxDist), (pos + maxDist));
         for (unsigned int i = 0; i < gLen; i++ ){
             if (g[i].tx.start <= r.start) {
                 if (g[i].tx.end < r.start){
@@ -854,7 +915,7 @@ private:
                             s += WITHIN_GENE_SEPARATOR;
                             // quick patch about codon number
                             char buf[128];
-                            sprintf(buf, "Base%d/%d", 
+                            sprintf(buf, "Base%d/%d",
                                     codonNum + 1, g.getCDSLength());
                             s += buf;
                             s += WITHIN_GENE_SEPARATOR;
@@ -1004,6 +1065,7 @@ int main(int argc, char *argv[])
         ADD_STRING_PARAMETER(pl, outputFile, "-o", "Specify output VCF file")
         ADD_STRING_PARAMETER(pl, geneFile, "-g", "Specify gene file")
         ADD_PARAMETER_GROUP(pl, "Optional Parameters")
+        ADD_STRING_PARAMETER(pl, inputFormat, "--inputFormat", "Specify format (default: vcf). \"-f plain \" will use first 4 columns as chrom, pos, ref, alt")
         ADD_STRING_PARAMETER(pl, referenceFile, "-r", "Specify reference genome position")
         ADD_STRING_PARAMETER(pl, geneFileFormat, "-f", "Specify gene file format (default: refFlat, other options knownGene)")
         ADD_STRING_PARAMETER(pl, priorityFile, "-p", "Specify priority of annotations")
@@ -1061,7 +1123,7 @@ int main(int argc, char *argv[])
     if (FLAG_referenceFile.size() == 0) {
         fprintf(stderr, "Use default codon file: /net/fantasia/home/zhanxw/anno/codon.txt\n");
         FLAG_referenceFile = "/data/local/ref/karma.ref/human.g1k.v37.fa";
-    } 
+    }
 
     ga.openReferenceGenome(FLAG_referenceFile.c_str());
     ga.openCodonFile(FLAG_codonFile.c_str());
@@ -1069,7 +1131,14 @@ int main(int argc, char *argv[])
 
     ga.setFormat(FLAG_geneFileFormat);
     ga.openGeneFile(FLAG_geneFile.c_str());
-    ga.annotate(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
+    if (toLower(FLAG_inputFormat) == "VCF" || FLAG_inputFormat.size() == 0) {
+        ga.annotateVCF(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
+    } else if (toLower(FLAG_inputFormat) == "PLAIN") {
+        ga.annotatePlain(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
+    } else {
+        fprintf(stderr, "Cannot recognize input file format: %s \n", FLAG_inputFile.c_str());
+        abort();
+    };
 
     LOG_END_TIME;
     LOG_END ;
@@ -1080,7 +1149,12 @@ int main(int argc, char *argv[])
     ga.openGeneFile("test.gene.txt");
     ga.openCodonFile("codon.txt");
     ga.openReferenceGenome("test.fa");
-    ga.annotate("test.vcf", "test.output.vcf");
+    if (FLAG_inputFormat == "vcf") {
+        ga.annotateVCF("test.vcf", "test.output.vcf");
+    } else if (FLAG_inputFormat == "plain") {
+        ga.annotatePlain("test.vcf", "test.output.vcf");
+    }
+
 #endif
     printf("Annotation succeed!\n");
     return 0;

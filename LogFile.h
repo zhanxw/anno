@@ -46,6 +46,8 @@
         pl.WriteToStream(LogFile::getLogger()->getStream());    \
     } while(0);
 
+
+
 // Use so-called Singleton pattern 
 // so that program-wide there is only one LogFile instance.
 class LogFile{

@@ -15,11 +15,16 @@ $(EXEC): Main.cpp Gene.h Range.h IO.h Argument.h FreqTable.h
 	g++ $(CXXFLAGS) -o $@ Main.o -lz -lbz2 -lssl -lcrypto
 clean:
 	rm -f *.o $(EXEC)
+# basic test
 test1: debug
 	(cd example; ../$(EXEC) -i test.vcf -r test.fa -g test.gene.txt -c ../codon.txt -o test.out.vcf)
 test2: debug
 	(cd example; ../$(EXEC) -i 100.vcf.gz -r test.fa -g ../resources/refFlat_hg19.txt.gz -c ../codon.txt -o 100.out.vcf)
 test3: debug
 	(cd example; ../$(EXEC) -i 100.vcf.gz -r ../resources/human.g1k.v37.fa -g ../resources/refFlat_hg19.txt.gz -c ../codon.txt -o 100.out.vcf)
+
+# test plain text file annotation
+test4: debug
+	(cd example; ../$(EXEC) -i test.plain.txt -r test.fa -g test.gene.txt -c ../codon.txt -o test.plain.anno.txt)
 Log: LogFile.cpp LogFile.h
 	g++ -g -o $@ $<
