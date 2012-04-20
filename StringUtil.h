@@ -30,6 +30,20 @@ int stringTokenize(const std::string& str, const char delim, std::vector<std::st
     return (stringTokenize(str, d, result));
 };
 
+bool isEmptyString(const std::string& s){
+    return s.size() == 0;
+};
+int stringNaturalTokenize(const std::string& str, const std::string& delim, std::vector<std::string>* result){
+    int ret = stringTokenize(str, delim, result);
+    ret = remove_if(result->begin(), result->end(), isEmptyString) - result->begin();
+    result->resize(ret);
+    return ret;
+};
+int stringNaturalTokenize(const std::string& str, const char delim, std::vector<std::string>* result){
+    std::string d;
+    return (stringNaturalTokenize(str, d, result));
+};
+
 //remove leading and trailing characters
 void stringStrip(std::string* input, const char* characters = " ") {
     size_t beg = input->find_first_not_of(characters);

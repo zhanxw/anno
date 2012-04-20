@@ -422,6 +422,87 @@ public:
         // output stats
         this->outputAnnotationStats(outputFileName);
     }
+    // plink associated results (.assoc files)
+    // NOTE: ref and alt allelel need to get from reference
+    //    1   1:196404269  196404269    A       19        0    G         6.61      0.01014           NA
+    void annotatePlink(const char* inputFileName, const char* outputFileName){
+        // open output file
+        FILE* fout = fopen(outputFileName, "wt");
+        assert(fout);
+
+        // open input file
+        std::vector<std::string> annotationString;
+        LineReader lr(inputFileName);
+        std::vector<std::string> field;
+        std::string line;
+        int totalVariants = 0;
+        while(lr.readLine(&line) > 0) {
+            if (line.size() == 0 || line[0] == '#') {
+                fputs(line.c_str(), fout);
+                fputc('\n', fout);
+                continue;
+            }
+            stringNaturalTokenize(line, " ", &field);
+            if (field.size() < 10) continue;
+            totalVariants++;
+            std::string chr = field[0];
+            int pos = toInt(field[2]);
+            std::string ref = toUpper(field[3]);
+            std::string alt = toUpper(field[6]);
+
+            // determine ref base from reference
+            bool refMatchRef = true;
+            for (int i = 0; i < ref.size(); i++ ) {
+                if (ref[i] != gs[chr][pos - 1 + i]) {
+                    refMatchRef = false;
+                    break;
+                }
+            }
+            if (!refMatchRef) {
+                bool altMatchRef = true;
+                for (int i = 0; i < alt.size(); i++ ) {
+                    if (alt[i] != gs[chr][pos - 1 + i]) {
+                        altMatchRef = false;
+                        break;
+                    }
+                }
+                if (!altMatchRef) {
+                    fprintf(stderr, "Ref [%s] and alt [%s] does not match reference: %s:%d\n", ref.c_str(), alt.c_str(), chr.c_str(), pos);
+                    continue;
+                } else {
+                    std::swap(ref, alt);
+                }                    
+            }
+                
+            // real part of annotation
+            annotate(chr, pos, ref, alt, &annotationString);
+
+            // output annotation result
+            // VCF info field is the 8th column
+            for (unsigned int i = 0; i < field.size(); i++ ){
+                fputs(field[i].c_str(), fout) ;
+                fputs("\t", fout);
+            }
+            if (annotationString.size() == 0) {
+                //intergenic
+                fputs(AnnotationString[INTERGENIC], fout);
+                fputs("\t", fout);
+                fputs(AnnotationString[INTERGENIC], fout);
+            } else {
+                fputs(squeezeAnnotation(annotationString, priority).c_str(), fout);
+                fputs("\t", fout);
+                fputs(stringJoin(annotationString, GENE_SEPARATOR).c_str(), fout);
+            }
+            fputc('\n', fout);
+        }
+        // close output
+        fclose(fout);
+        fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
+        LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
+
+        // output stats
+        this->outputAnnotationStats(outputFileName);
+    }
     void outputAnnotationStats(const char* outputFileName) {
         // output frequency files
         std::string fn = outputFileName;
@@ -596,7 +677,7 @@ private:
                      const std::string& ref, const std::string& alt,
                      char refTriplet[3], char altTriplet[3]) {
         assert(ref.size() == 1 && alt.size() == 1);
-        const std::string& seq = this->gs[chr];
+        const Chromosome& seq = this->gs[chr];
         if (codonPos[0] < 0 || codonPos[2] > seq.size()) {
             refTriplet[0] = refTriplet[1] = refTriplet[2] = 'N';
             altTriplet[0] = altTriplet[1] = altTriplet[2] = 'N';
@@ -1135,7 +1216,9 @@ int main(int argc, char *argv[])
         ga.annotateVCF(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
     } else if (toLower(FLAG_inputFormat) == "PLAIN") {
         ga.annotatePlain(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
-    } else {
+    } else if (toLower(FLAG_inputFormat) == "PLINK") {
+        ga.annotatePlink(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
+    } else{
         fprintf(stderr, "Cannot recognize input file format: %s \n", FLAG_inputFile.c_str());
         abort();
     };

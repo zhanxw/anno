@@ -1,61 +1,188 @@
 #ifndef _GENOMESEQUENCE_H_
 #define _GENOMESEQUENCE_H_
 
+// .fai format
+// contig, size, location, basesPerLine, bytesPerLine
+// e.g.
+// 1       249250621       52      60      61
+// 2       243199373       253404903       60      61
+class Faidx{
+public:
+  struct Info{
+    int contigSize;
+    int offset;
+    int basePerLine;
+    int bytePerLine;
+  };
+public:
+  /// @return: # of contigs read, minus number means errors!
+  /// @param: file name
+  int loadFaidx(const char* fn){
+    LineReader lr(fn);
+    std::vector<std::string> fd;
+    int lineNo = 0;
+    while (lr.readLineBySep(&fd, "\t")){
+      lineNo ++;
+      if (fd.size() != 5) {
+        fprintf(stderr, "Wrong format: %s...\n", fd[0].c_str());
+        continue;
+      };
+      Faidx::Info info;
+      if ( !str2int( fd[1], &info.contigSize) ) {
+        fprintf(stderr, "Cannot convert to integer at line %d!\n", lineNo);
+        continue;
+      }
+      if ( !str2int( fd[2], &info.offset) ) {
+        fprintf(stderr, "Cannot convert to integer at line %d!\n", lineNo);
+        continue;
+      }
+      if ( !str2int( fd[3], &info.basePerLine) ) {
+        fprintf(stderr, "Cannot convert to integer at line %d!\n", lineNo);
+        continue;
+      }
+      if ( !str2int( fd[4], &info.bytePerLine) ) {
+        fprintf(stderr, "Cannot convert to integer at line %d!\n", lineNo);
+        continue;
+      }
+      if (this->data.count(fd[0]) != 0) {
+        fprintf(stderr, "Warning, duplicate contig name at line %d!", lineNo);
+      }
+      this->data[fd[0]] = info;
+    };
+    return this->data.size();
+  };
+  Faidx::Info* getInfo(const std::string& chr){
+    if (data.count(chr) == 0) {
+      return NULL;
+    } else {
+      return &(data[chr]);
+    }
+  };
+  int size() const {
+    return data.size();
+  };
+  long int getGenomeLength() const {
+    long int l = 0;
+    std::map<std::string, Faidx::Info>::const_iterator it;
+    for (it = data.begin(); it != data.end(); it++){
+      l += it->second.contigSize;
+    }
+    return l;
+  }
+private:
+  std::map<std::string, Faidx::Info> data;
+};
+
+class Chromosome{
+public:
+  explicit Chromosome(FILE* faFile, Faidx::Info* info): fp(faFile), info(info) {
+  };
+  explicit Chromosome():fp(NULL), info(NULL){};
+  explicit Chromosome(const Chromosome& chrom) {
+    this->fp = chrom.fp;
+    this->info = chrom.info;
+  };
+public:
+  char operator[] (int offset) const {
+    int lineNo = offset / info->basePerLine;
+    int remainder = offset % info->basePerLine;
+    int pos = info->offset + lineNo * info->bytePerLine + remainder;
+    if ( fseek(fp, pos, SEEK_SET) ) {
+      fprintf(stderr, "Cannot fseek()!\n");
+      return 'N';
+    }
+    char c;
+    if (1 != fread(&c, sizeof(char), 1, this->fp)) {
+      fprintf(stderr, "Cannot fread()!\n");
+      return 'N';
+    }
+    return c;
+  };
+  int size() const{
+    return info->contigSize;
+  };
+private:
+  Faidx::Info* info;
+  FILE* fp;
+};
+
 class GenomeSequence{
 public:
-    /**
-     * @return true: if loads successful
-     */
-    bool open(const char* fileName){
-        LineReader lr(fileName);
-        std::string line;
-        std::string chr = "";
-        while(lr.readLine(&line) > 0) {
-            if (line.size() > 0) {
-                if (line[0] == '>') {
-                    // new chromosome
-                    unsigned int idx = line.find_first_of(' ');
-                    chr = line.substr(1, idx - 1);
-                    this->data[chr] = "";
-                } else {
-                    stringStrip(&line);
-                    if (this->data.find(chr) != this->data.end())
-                        this->data[chr] += line;
-                }
-            }
-        }
-        return true;
-    };
-    /**
-     * @return total number of chromosome
-     */
-    int size() const {
-        return this->data.size();
-    };
-    /**
-     * @return total number of chromosome
-     */
-    long int getGenomeLength() const {
-        long int l = 0;
-        std::map<std::string, std::string>::const_iterator it;
-        for (it = this->data.begin(); it != this->data.end() ; it++) {
-            l += (it->second).size();
-        }
-        return l;
-    };
-    std::string& getChromosome(const char* c){
-        return this->data[c];
-    };
-    const std::string& operator[] (const std::string& c) {
-        return this->data[c];
+GenomeSequence():fp(NULL){};
+  virtual ~GenomeSequence(){
+    if (this->fp) {
+      fclose(this->fp);
     }
-    bool exists(const std::string& c){
-        if (this->data.find(c) != this->data.end())
-         return true;
-        return false;
-    }
+  };
+private:
+  //forbid copying
+  GenomeSequence(const GenomeSequence& gs);
+  GenomeSequence& operator= (const GenomeSequence& gs);
 public:
-    std::map<std::string, std::string> data;
+  /**
+   * @return true: if loads successful
+   */
+  bool open(const char* fileName){
+    // load .fa
+    this->fp = fopen(fileName, "r");
+    if (!this->fp) {
+      fprintf(stderr, "Cannot open file: %s!", fileName);
+      return false;
+    }
+
+    // load .fai
+    std::string faiName = fileName;
+    faiName.append(".fai");
+    if (this->faidx.loadFaidx(faiName.c_str()) < 0) {
+      fprintf(stderr, "Cannot open fai file!");
+      return false;
+    }
+    
+    return true;
+  };
+  
+  /**
+   * @return total number of chromosome
+   */
+  int size() const {
+    return this->faidx.size();
+  };
+  /**
+   * @return total number of chromosome
+   */
+  long int getGenomeLength() const {
+    return faidx.getGenomeLength();
+  };
+
+  Chromosome& getChromosome(const std::string& c){
+    std::map<std::string, Chromosome>::iterator it = data.find(c);
+    if (it == data.end()) {
+      Chromosome chrom(fp, faidx.getInfo(c));
+      data[c] = chrom;
+      return data[c];
+    } else {
+      return (it->second);
+    }
+  };
+  const Chromosome& operator[] (const std::string& c) {
+    std::map<std::string, Chromosome>::const_iterator it = data.find(c);
+    if (it == data.end()) {
+      Chromosome chrom(fp, faidx.getInfo(c));
+      data[c] = chrom;
+      return data[c];
+    } else {
+      return (it->second);
+    }
+  }
+  bool exists(const std::string& c){
+    if (this->data.find(c) != this->data.end())
+      return true;
+    return false;
+  }
+public:
+  std::map<std::string, Chromosome> data;
+  FILE* fp;
+  Faidx faidx;
 };
 
 
