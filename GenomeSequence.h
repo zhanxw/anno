@@ -185,6 +185,4 @@ public:
   Faidx faidx;
 };
 
-
-
 #endif /* _GENOMESEQUENCE_H_ */
