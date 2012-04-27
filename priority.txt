@@ -1,3 +1,6 @@
+# Priority file
+# * higher priority is listed before low priority
+
 # large strucutre variant
 StructuralVariation
 
