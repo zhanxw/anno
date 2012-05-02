@@ -144,6 +144,19 @@ struct Priority{
       return it->second;
     }
   };
+  std::string toString(const int priority) const {
+    std::string s;
+    std::map<int, std::string>::const_iterator it;
+    it = this->priorityInt2Str.find(priority);
+    if (it == this->priorityInt2Str.end()) {
+      return s;
+    } else{
+      return it->second;
+    }
+  };
+  static int getLeastPriority(){
+    return 9999;
+  }
  private:
   int priorityIdx;
   std::map<int, std::string> priorityInt2Str;
@@ -173,11 +186,28 @@ class AnnotationResult{
     for (int i = 0; i < type.size(); i++) {
       s += WITHIN_GENE_SEPARATOR;
       s += AnnotationString[type[i]];
+      // for synonymous or non-synonymous, we may output details
+      std::map<AnnotationType, std::string>::const_iterator iter;
+      iter = this->detail.find(type[i]);
+      if (iter != this->detail.end()) {
+        s += iter->second;
+      }
     }
-    if (detail.size()) {
-      s += WITHIN_GENE_SEPARATOR;
-      s += this->detail;
+    return s;
+  };
+  std::string getTopPriorityString(const Priority& p) const{
+    int highest = Priority::getLeastPriority();
+    int highestIdx = 0;
+    for (unsigned int i = 0; i != type.size(); i++) {
+      int t = p.getPriority(type[i]);
+      if (t <= highest){
+        highest = t;
+        highestIdx = i;
+      }
     }
+    std::string s = AnnotationString[type[highestIdx]]; // #p.toString(highest);
+    s += WITHIN_GENE_SEPARATOR;                                   
+    s += this->geneName;
     return s;
   };
   void add(const Gene& g){
@@ -193,42 +223,60 @@ class AnnotationResult{
     this->type.push_back(t);
   };
   // add extra details such as "(CCT/Pro->CAT/His)" to the last element
-  void addDetail(const std::string& s) {
-    this->detail = s;
+  void addDetail(const AnnotationType& t, const std::string& s) {
+    this->detail[t] = s;
   };
+  // return lowest priority (most important)
   int getPriority(const Priority& p) const {
-    int highest = -1;
+    int highest = Priority::getLeastPriority();
     int t;
     for (unsigned int i = 0; i != type.size(); i++) {
       t = p.getPriority(type[i]);
-      if (t >= highest)
+      if (t < highest)
         highest = t;
     }
+    // fprintf(stderr, "highest priority is %s.\n", p.toString(highest).c_str());
     return highest;
+  };
+  const std::string& getGeneName() const{
+    return this->geneName;
   };
  private:
   std::string geneName;
   bool isForwardStrand;
   std::vector<AnnotationType> type;
-  std::string detail;
+  std::map<AnnotationType, std::string> detail;
 };
 
 class AnnotationOutput{
  public:
+  // Format:
+  //  Most_priority:gene1|gene2
   std::string getHighestAnnotation(const std::vector<AnnotationResult>& r, const Priority& p) const{
     if (r.size() == 0) {
       return AnnotationString[INTERGENIC];
     };
-    unsigned int highestPriority = -1;
+    std::vector<std::string> res;
+    
+    int highestPriority = Priority::getLeastPriority();
     unsigned int highestIdx = 0;
     for (unsigned int i = 0; i != r.size(); i++) {
       int priority = r[i].getPriority(p) ;
-      if (priority > highestPriority) {
+      if (priority < highestPriority) {
         highestPriority = priority;
         highestIdx = i;
+        res.clear();
+        res.push_back(r[i].getGeneName());
+      } else if (priority == highestPriority) {
+        res.push_back(r[i].getGeneName());
       }
+      // fprintf(stderr, "highest annotation is %s\n", p.toString(highestPriority).c_str());
     }
-    return r[highestIdx].toString();
+    // return r[highestIdx].getTopPriorityString(p);
+    std::string ret = p.toString(highestPriority).c_str();
+    ret += WITHIN_GENE_SEPARATOR;
+    ret += stringJoin(res, GENE_SEPARATOR);
+    return ret;
   };
   
   std::string getFullAnnotation(const std::vector<AnnotationResult>& r){
@@ -370,6 +418,9 @@ class GeneAnnotation{
     return res;
   };
 #endif
+  /**
+   * parse input file, and call annotate(), and then output results
+   */
   void annotateVCF(const char* inputFileName, const char* outputFileName){
     // open output file
     FILE* fout = fopen(outputFileName, "wt");
@@ -377,7 +428,6 @@ class GeneAnnotation{
 
     // open input file
     AnnotationOutput outputter;
-    std::vector<AnnotationResult> annotationResult;
     LineReader lr(inputFileName);
     std::vector<std::string> field;
     std::string line;
@@ -595,7 +645,7 @@ class GeneAnnotation{
     std::vector<unsigned> potentialGeneIdx;
     this->findInRangeGene(chrom, pos, &potentialGeneIdx);
     // if Intergenic,  we will have (potentialGeneIdx.size() == 0)
-    annotationResult->clear();
+    this->annotationResult.clear();
     AnnotationResult annotationPerGene;
 
     // determine variation type
@@ -796,7 +846,7 @@ class GeneAnnotation{
               s+= aaName;
             }
             s+= WITHIN_GENE_RIGHT_DELIM;
-            result->addDetail(s);
+            result->addDetail(CODON_GAIN, s);
           } else {
             result->add(FRAME_SHIFT);
           }
@@ -1051,7 +1101,7 @@ class GeneAnnotation{
               s += "/";
               s += toStr( (int)( g.exon.size()));
               s += WITHIN_GENE_RIGHT_DELIM;
-              result->addDetail(s);
+              result->addDetail(annotationType, s);
               // record frequency
               this->codonFreq.add(refAAName+"->"+altAAName);
             } else {
@@ -1090,7 +1140,7 @@ class GeneAnnotation{
   void annotateByGene(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
                       const VARIATION_TYPE& type,
                       AnnotationResult* result){
-    this->annotationResult.clear();
+    result->clear();
     switch(type) {
       case SNP:
         this->annotateSNP(geneIdx, chr, variantPos, ref, alt, result);
