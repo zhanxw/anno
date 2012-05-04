@@ -1302,11 +1302,11 @@ int main(int argc, char *argv[])
   param.spliceIntoExon = FLAG_spliceIntoExon ? FLAG_spliceIntoExon : 3;
   param.spliceIntoIntron = FLAG_spliceIntoIntron ? FLAG_spliceIntoIntron : 8;
 
-#if 1
   std::string logFileName = FLAG_outputFile + ".log";
   LOG_START(logFileName.c_str());
   LOG_START_TIME;
   LOG_PARAMETER(pl);
+
   GeneAnnotation ga;
   pl.Status();
   ga.setAnnotationParameter(param);
@@ -1343,20 +1343,6 @@ int main(int argc, char *argv[])
 
   LOG_END_TIME;
   LOG_END ;
-#else
-  // debug purpose
-  GeneAnnotation ga;
-  ga.setFormat(FLAG_geneFileFormat);
-  ga.openGeneFile("test.gene.txt");
-  ga.openCodonFile("codon.txt");
-  ga.openReferenceGenome("test.fa");
-  if (FLAG_inputFormat == "vcf") {
-    ga.annotateVCF("test.vcf", "test.output.vcf");
-  } else if (FLAG_inputFormat == "plain") {
-    ga.annotatePlain("test.vcf", "test.output.vcf");
-  }
-
-#endif
   printf("Annotation succeed!\n");
   return 0;
 }

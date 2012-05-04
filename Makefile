@@ -10,7 +10,7 @@ release: $(EXEC)
 debug: CXXFLAGS = -ggdb -O0 $(DEFAULT_CXXFLAGS)
 debug: $(EXEC)
 
-$(EXEC): Main.cpp Gene.h Range.h IO.h Argument.h FreqTable.h GenomeSequence.h
+$(EXEC): Main.cpp Gene.h Range.h IO.h Argument.h FreqTable.h GenomeSequence.h LogFile.h
 	g++ $(CXXFLAGS) -c Main.cpp
 	g++ $(CXXFLAGS) -o $@ Main.o -lz -lbz2 -lssl -lcrypto
 clean:

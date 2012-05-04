@@ -218,6 +218,11 @@ class ParameterParser{
         if (strlen(comment) > 0) {
             fprintf(fp, "# %s\n", comment);
         } else {
+          char username[128] = "unknown_user";
+          char* pUsername = getenv("LOGNAME");
+          if (pUsername != NULL) {
+            strncpy(username, pUsername, 128);
+          };
             char hostName[128] = "";
             if (gethostname(hostName, 128) == 0) {
                 // succes
@@ -228,7 +233,7 @@ class ParameterParser{
             time_t tt = time(0);
             // ctime() will output an extra \n
             fprintf(fp, "# ParameterList created by %s on %s at %s", 
-                    getlogin(), hostName, ctime(&tt));
+                    username, hostName, ctime(&tt));
         }
         int numFlagOutputted = 0;
         for (int i = 0; i < this->flagVec.size(); i++){
@@ -288,6 +293,11 @@ class ParameterParser{
         if (strlen(comment) > 0) {
             fout << "# " << comment << "\n";
         } else {
+          char username[128] = "unknown_user";
+          char* pUsername = getenv("LOGNAME");
+          if (pUsername != NULL) {
+            strncpy(username, pUsername, 128);
+          };
             char hostName[128] = "";
             if (gethostname(hostName, 128) == 0) {
                 // succes
@@ -297,7 +307,7 @@ class ParameterParser{
             }
             time_t tt = time(0);
             // ctime() will output an extra \n
-            fout << "# ParameterList created by " << getlogin() << " on "<< hostName << " at " << ctime(&tt);
+            fout << "# ParameterList created by " << username << " on "<< hostName << " at " << ctime(&tt);
         }
         int numFlagOutputted = 0;
         for (int i = 0; i < this->flagVec.size(); i++){

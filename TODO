@@ -1,6 +1,5 @@
 TODO
 ====
-9. output frequency of uniq annotation type and duplicated annotation type
 6. write a log file, parameter, start time, end time, how
    many gene, how many variant
 7. output site files for different category of annotation.
@@ -31,3 +30,5 @@ DONE
 
 4. support various input formats (partly done on gene file)
    support GENCODE (have script to convert GENOCODE to refFlat)
+
+9. output frequency of uniq annotation type and duplicated annotation type
