@@ -177,7 +177,7 @@ struct Priority{
   int priorityIdx;
   std::map<int, std::string> priorityInt2Str;
   std::map<std::string, int> priorityStr2Int;
-};
+}; // end Priority
 
 /**
  * For each gene, we use AnnotationResult to store all annotation results.
@@ -287,7 +287,7 @@ class AnnotationResult{
   std::vector<AnnotationType> type;
   std::map<AnnotationType, std::string> detail;
   int topPriorityIndex;  // this->type[this->topPriorityIndex] has top priority; <0, means unknown
-};
+}; // end AnnotationResult
 
 class AnnotationOutput{
  public:
@@ -332,7 +332,7 @@ class AnnotationOutput{
     }
     return s;
   };
-};
+}; // end AnnotationOutput
 
 struct GeneAnnotationParam{
   GeneAnnotationParam():
@@ -463,7 +463,6 @@ class GeneAnnotation{
 
     // open input file
     AnnotationOutput outputter;
-    std::vector<AnnotationResult> annotationResult;
     LineReader lr(inputFileName);
     std::vector<std::string> field;
     std::string line;
@@ -514,7 +513,6 @@ class GeneAnnotation{
 
     // open input file
     AnnotationOutput outputter;
-    std::vector<AnnotationResult> annotationResult;
     LineReader lr(inputFileName);
     std::vector<std::string> field;
     std::string line;

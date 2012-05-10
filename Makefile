@@ -25,7 +25,7 @@ test3: debug
 
 # test plain text file annotation
 test4: debug
-	(cd example; ../$(EXEC) -i test.plain.txt -r test.fa -g test.gene.txt -c ../codon.txt -o test.plain.anno.txt --inputFormat plain)
+	(cd example; ../$(EXEC) --inputFormat plain -i test.plain.txt -r test.fa -g test.gene.txt -c ../codon.txt -o test.plain.anno.txt --inputFormat plain)
 
 test: test1 test2 test3 test4
 check:
