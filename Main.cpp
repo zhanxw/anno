@@ -103,8 +103,8 @@ const char* AnnotationString[]= {
 #define REVERSE_STRAND_STRING "-"
 #define WITHIN_GENE_LEFT_DELIM '('
 #define WITHIN_GENE_RIGHT_DELIM ')'
-#define ANNOTATION_START_TAG "ANNO="
-#define ANNOTATION_START_TAG_FULL "ANNOFULL="
+#define VCF_ANNOTATION_START_TAG "ANNO="
+#define VCF_ANNOTATION_START_TAG_FULL "ANNOFULL="
 #define VCF_INFO_SEPARATOR ';'
 #define WITHIN_GENE_SEPARATOR ':'
 // #define GENE_SEPARATOR '|'
@@ -192,30 +192,6 @@ class AnnotationResult{
     this->detail.clear();
     this->topPriorityIndex = -1;
   };
-#if 0
-  /**
-   * will need to refactor using annotation output
-   */
-  std::string toString() const{
-    fprintf(stderr, "Deprecated!\n");
-    std::string s;
-    s += this->geneName;
-    s += WITHIN_GENE_SEPARATOR;
-    s += isForwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING;
-
-    for (int i = 0; i < type.size(); i++) {
-      s += WITHIN_GENE_SEPARATOR;
-      s += AnnotationString[type[i]];
-      // for synonymous or non-synonymous, we may output details
-      std::map<AnnotationType, std::string>::const_iterator iter;
-      iter = this->detail.find(type[i]);
-      if (iter != this->detail.end()) {
-        s += iter->second;
-      }
-    }
-    return s;
-  };
-#endif
   std::string toString(StringTemplate* t) const{
     std::vector<std::string> type;
     std::string s;
@@ -232,7 +208,7 @@ class AnnotationResult{
     t->add("GENE_NAME", this->geneName);
     t->add("GENE_STRAND", isForwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING);
     t->add("TYPE", type);
-    
+
     t->translate(&s);
     return s;
   };
@@ -297,7 +273,7 @@ class AnnotationResult{
   const std::string& getGeneName() const{
     return this->geneName;
   };
-  
+
   const std::vector<AnnotationType>& getType() const{
     return this->type;
   };
@@ -484,7 +460,7 @@ class GeneAnnotation{
       // real part of annotation
       annotate(chr, pos, ref, alt, &annotationResult);
       outputter.setAnnotationResult(annotationResult);
-      
+
       // output annotation result
       // VCF info field is the 8th column
       for (unsigned int i = 0; i < field.size(); i++ ){
@@ -494,10 +470,10 @@ class GeneAnnotation{
           if (field[i].size() != 0) {
             fputc(VCF_INFO_SEPARATOR, fout);
           }
-          fputs(ANNOTATION_START_TAG, fout);
+          fputs(VCF_ANNOTATION_START_TAG, fout);
           fputs(outputter.getTopPriorityAnnotation(annotationResult, this->priority).c_str(), fout);
           fputc(VCF_INFO_SEPARATOR, fout);
-          fputs(ANNOTATION_START_TAG_FULL, fout);
+          fputs(VCF_ANNOTATION_START_TAG_FULL, fout);
           fputs(outputter.getFullAnnotation(annotationResult).c_str(), fout);
         }
       }
@@ -648,7 +624,7 @@ class GeneAnnotation{
     this->printTopPriorityAnnotationFrequency(ofs.c_str());
     fprintf(stdout, "DONE: Generated frequency of each highest priority annotation type in [ %s ].\n", ofs.c_str());
     LOG << "Generate frequency of high priority for highest priority annotation type in " << ofs << " succeed!\n";
-    
+
     // output base change frequency
     ofs = fn+".base.frq";
     this->printBaseChangeFrequency(ofs.c_str());
@@ -760,7 +736,7 @@ class GeneAnnotation{
     }
     fclose(fp);
   };
-  
+
   void printBaseChangeFrequency(const char* fileName){
     FILE* fp = fopen(fileName, "wt");
     assert(fp);
