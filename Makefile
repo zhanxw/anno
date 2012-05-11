@@ -45,3 +45,7 @@ correct:
 # auxillary tools
 Log: LogFile.cpp LogFile.h
 	g++ -g -o $@ $<
+
+
+testStringTemplate: testStringTemplate.cpp StringTemplate.h
+	g++ -g -o $@ $<
