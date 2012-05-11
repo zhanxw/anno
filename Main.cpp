@@ -109,8 +109,6 @@ const char* AnnotationString[]= {
 #define WITHIN_GENE_SEPARATOR ':'
 // #define GENE_SEPARATOR '|'
 
-
-
 /**
  * priority are given by lineNo
  * small number -> high priority (more important)

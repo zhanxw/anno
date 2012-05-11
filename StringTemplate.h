@@ -153,7 +153,8 @@ public:
 
   /**
    * @param str: store translated result in str
-   * @return 0: if success
+   * @return 0: if success;
+   * when translation is unsuccessful, the @param str is not reliable.
    */
   int translate(std::string* str) const {
     std::string& s = *str;
@@ -191,6 +192,7 @@ public:
     return 0;
   };
   /**
+   * Split template into chunks of 3 types: text, keyword, array 
    *  @return 0: when parse succeeds
    */
   int parse(const std::string& s) {
@@ -216,8 +218,10 @@ public:
       switch (key.type) {
         case TEXT:
           if (s[end] == '$' && s[end-1] != '\\') { // change mode
-            key.type = TEXT;
-            this->data.push_back(key);
+            if (key.text.size()) {
+              key.type = TEXT;
+              this->data.push_back(key);
+            }
             key.clear();
             if (s[end + 1] == '[') {
               beg = end + 2;
@@ -238,6 +242,10 @@ public:
           if (s[end] == ')' && s[end-1] != '\\'){  // change mode
             key.type = KEYWORD;
             key.keyword = std::string(s+beg, s+end);
+            if (key.keyword.size() == 0) {
+              fprintf(stderr, "Empty keyword in %s!\n", s);
+              return -1;
+            };
             this->data.push_back(key);
             if (!isValidKeyword(key.keyword.c_str())) {
               fprintf(stderr, "Wrong keyword %s!\n", s);
@@ -332,6 +340,10 @@ int StringTemplate::Array::parse(const char* s, int param_beg, int param_end){
       break;
     }
   };
+  if (real_beg == real_end) {
+    fprintf(stderr, "Cannot parse array: %s", s+real_beg);
+    return -1;
+  };
   int beg = real_beg;
   int end = real_beg;
   KEY* pKey = new KEY;
@@ -347,8 +359,10 @@ int StringTemplate::Array::parse(const char* s, int param_beg, int param_end){
     switch (key.type) {
       case TEXT:
         if (s[end] == '$' && s[end-1] != '\\') { // change mode
-          key.type = TEXT;
-          this->data.push_back(key);
+          if (key.text.size()) {
+            key.type = TEXT;
+            this->data.push_back(key);
+          }
           key.clear();
           if (s[end + 1] == '[') {
             beg = end + 2;
