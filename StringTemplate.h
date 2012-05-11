@@ -38,7 +38,7 @@ public:
   struct VALUE;
   class Array {
  public:
-    int translate(std::string* str, const std::map<std::string, VALUE>& dict);
+    int translate(std::string* str, const std::map<std::string, VALUE>& dict) const;
     /**
      * Parse s[beg...end]  beg: inclusive end: exclusive
      */
@@ -121,14 +121,20 @@ public:
   std::vector<KEY> data;
   std::map<std::string, VALUE> dict; // store key->value pair
 
+  static bool isValidKeyword(const char c){
+      if (!isalnum(c) && c != '_')
+        return false;
+      return true;
+  };
   static bool isValidKeyword(const char* s){
     while ( *s != '\0') {
-      if (!isalnum(*s))
+      if (! isValidKeyword(*s))
         return false;
       s++;
     }
     return true;
   }
+  
   void add(const char* key, const char* value) {
     VALUE v;
     v.type = STRING;
@@ -149,11 +155,11 @@ public:
    * @param str: store translated result in str
    * @return 0: if success
    */
-  int translate(std::string* str) {
+  int translate(std::string* str) const {
     std::string& s = *str;
     s.clear();
     for (unsigned int i = 0; i < data.size(); i++) {
-      KEY& k = data[i];
+      const KEY& k = data[i];
       switch(k.type) {
         case TEXT:
           s += k.text;
@@ -162,7 +168,9 @@ public:
           if (dict.find(k.keyword) == dict.end()) {
             fprintf(stderr, "Data translation error for key %s!\n", k.keyword.c_str());
           } else {
-            VALUE& v = dict[k.keyword];
+            std::map<std::string, VALUE>::const_iterator iter;
+            iter = dict.find(k.keyword);
+            const VALUE& v = iter->second;
             if (v.type == STRING) {
               s += v.string;
             } else {
@@ -237,8 +245,8 @@ public:
             key.clear();
             key.type = TEXT;
           } else {
-            if ( !isalnum(s[end]) ) {
-              fprintf(stderr, "Wrong keyword name: %c in %s", s[end], s);
+            if ( !isValidKeyword(s[end]) ) {
+              fprintf(stderr, "Wrong keyword name: %c in %s\n", s[end], s);
               return -1;
             }
           };
@@ -263,70 +271,19 @@ public:
     this->data.clear();
     this->dict.clear();
   }
-
-
-  /**
-   */
-#if 0
-public:
-  StringTemplate(const char* t){
-    this->temp = t;
-  };
-  StringTemplate(const std::string& t){
-    this->temp = t;
-  };
-  /// totally reset StringTemplate
-  void clear() {
-
-  };
-  void add(const char* key, const char* value){
-    std::string k = key;
-    this->data[k] = value;
-  };
-  /**
-   *@param s: translation results is s
-   *@return: how many key words are translateds
-   */
-  int translate(std::string* s){
-    assert(s);
-    s->assign(this->temp);
-    int nTrans = 0; // count how many keywords are translated
-    std::map<std::string, std::string>::const_iterator it;
-    for (it = this->data.begin(); it != this->data.end(); it++){
-      const std::string& key = it->first;
-      const std::string& value = it->second;
-      int pos = s->find(key);
-      int kLen= key.size();
-      // check if the keyword in the template looks like $(key)
-      if (pos == std::string::npos ||
-          pos - 2 < 0 || (*s)[pos-2] != '$' ||
-          (*s)[pos-1] != '(' ||
-          pos + kLen >= s->size() || (*s)[pos+kLen] != ')')
-        continue;
-      nTrans++;
-      s->replace(pos - 2 , kLen + 3, value);
-    }
-    return nTrans;
-  };
-private:
-  std::map<std::string, std::string> data;
-  std::string temp; // temp meaning template, as template is a keyword.
-#endif
 };
 
-int StringTemplate::Array::translate(std::string* str, const std::map<std::string, VALUE>& dict) {
+int StringTemplate::Array::translate(std::string* str, const std::map<std::string, VALUE>& dict) const{
   std::string& s = *str;
   std::map<std::string, VALUE>::const_iterator iter;
 
-  unsigned int maxStringArraySize = 0;
   unsigned int idx = 0;
-  bool reachValueEnd = true;
+  int maxStringArraySize = -1; // less than zero for initialization
   do {
-    reachValueEnd = true;
     if (idx)
       s += this->delim;
     for (unsigned int i = 0; i < data.size(); i++) {
-      KEY& k = data[i];
+      const KEY& k = data[i];
       switch(k.type) {
         case TEXT:
           s += k.text;
@@ -340,24 +297,14 @@ int StringTemplate::Array::translate(std::string* str, const std::map<std::strin
             if (v.type == STRING) {
               s += v.string;
             } else {
-              if (idx < v.array.size() - 1) {
-                reachValueEnd = false;
+              if (maxStringArraySize < 0) {
+                maxStringArraySize = v.array.size();
               } else {
-                reachValueEnd = true;
-              }
-              if (idx == 0) { // make sure all string array have the same size
-                if (maxStringArraySize == 0) {
-                  if (v.array.size() > 0) {
-                    maxStringArraySize = v.array.size();
-                  }
-                } else {
-                  if (maxStringArraySize != v.array.size()) {
+                if (v.array.size() != maxStringArraySize) {
                     fprintf(stderr, "Unbalanced vector size. Stopped when tranlating %s!\n", k.keyword.c_str());
-                    return -1;
-                  };
                 }
               }
-              if (v.array.size() > 0) {
+              if (idx < v.array.size()) {
                 s += v.array[idx];
               }
             };
@@ -372,7 +319,7 @@ int StringTemplate::Array::translate(std::string* str, const std::map<std::strin
       };
     }
     idx ++;
-  } while (! reachValueEnd);
+  } while (maxStringArraySize >= 0 && idx < maxStringArraySize);
   return 0;
 };
 int StringTemplate::Array::parse(const char* s, int param_beg, int param_end){
@@ -429,7 +376,7 @@ int StringTemplate::Array::parse(const char* s, int param_beg, int param_end){
             fprintf(stderr, "Wrong keyword %s!\n", s);
           }
         } else {
-          if ( !isalnum(s[end]) ) {
+          if ( !isValidKeyword(s[end]) ) {
             fprintf(stderr, "Wrong keyword name: %c in %s", s[end], s);
             return -1;
           }

@@ -68,6 +68,5 @@ int main(int argc, char *argv[])
   assert( 0 == t1.translate(&ret));
   assert( ret == e1);
 
-  
   return 0;
 }

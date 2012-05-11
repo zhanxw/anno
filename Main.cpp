@@ -19,6 +19,7 @@
 #include "GeneFormat.h"
 #include "SequenceUtil.h"
 #include "FreqTable.h"
+#include "StringTemplate.h"
 
 void banner(FILE* fp) {
   const char* string =
@@ -100,13 +101,14 @@ const char* AnnotationString[]= {
 // here we define format or the annotation.
 #define FORWARD_STRAND_STRING "+"
 #define REVERSE_STRAND_STRING "-"
-#define INFO_SEPARATOR ';'
-#define ANNOTATION_START_TAG "ANNO="
-#define ANNOTATION_START_TAG_FULL "ANNOFULL="
-#define GENE_SEPARATOR '|'
-#define WITHIN_GENE_SEPARATOR ':'
 #define WITHIN_GENE_LEFT_DELIM '('
 #define WITHIN_GENE_RIGHT_DELIM ')'
+#define ANNOTATION_START_TAG "ANNO="
+#define ANNOTATION_START_TAG_FULL "ANNOFULL="
+#define VCF_INFO_SEPARATOR ';'
+#define WITHIN_GENE_SEPARATOR ':'
+// #define GENE_SEPARATOR '|'
+
 
 
 /**
@@ -190,14 +192,12 @@ class AnnotationResult{
     this->detail.clear();
     this->topPriorityIndex = -1;
   };
+#if 0
   /**
    * will need to refactor using annotation output
    */
   std::string toString() const{
-    // *annotationString += g.name;
-    // *annotationString += g.forwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING;
-    // annotationString->push_back(WITHIN_GENE_SEPARATOR);
-    // *annotationString+=(stringJoin(annotation, WITHIN_GENE_SEPARATOR));
+    fprintf(stderr, "Deprecated!\n");
     std::string s;
     s += this->geneName;
     s += WITHIN_GENE_SEPARATOR;
@@ -213,6 +213,27 @@ class AnnotationResult{
         s += iter->second;
       }
     }
+    return s;
+  };
+#endif
+  std::string toString(StringTemplate* t) const{
+    std::vector<std::string> type;
+    std::string s;
+    for (int i = 0; i < this->type.size(); i++) {
+      s =  AnnotationString[this->type[i]];
+      // for synonymous or non-synonymous, we may output details
+      std::map<AnnotationType, std::string>::const_iterator iter;
+      iter = this->detail.find(this->type[i]);
+      if (iter != this->detail.end()) {
+        s += iter->second;
+      }
+      type.push_back(s);
+    }
+    t->add("GENE_NAME", this->geneName);
+    t->add("GENE_STRAND", isForwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING);
+    t->add("TYPE", type);
+    
+    t->translate(&s);
     return s;
   };
 
@@ -254,17 +275,17 @@ class AnnotationResult{
     return this->topPriorityIndex;
   };
 
-  /**
-   * @return top priority string.
-   * NOTE: should call calculateTopPriority first!
-   */
-  std::string getTopPriorityString() const{
-    assert( this->topPriorityIndex >= 0);
-    std::string s = AnnotationString[this->topPriorityIndex]; // #p.toString(highest);
-    s += WITHIN_GENE_SEPARATOR;
-    s += this->geneName;
-    return s;
-  };
+  // /**
+  //  * @return top priority string.
+  //  * NOTE: should call calculateTopPriority first!
+  //  */
+  // std::string getTopPriorityString() const{
+  //   assert( this->topPriorityIndex >= 0);
+  //   std::string s = AnnotationString[this->topPriorityIndex]; // #p.toString(highest);
+  //   s += WITHIN_GENE_SEPARATOR;
+  //   s += this->geneName;
+  //   return s;
+  // };
 
   AnnotationType getTopPriorityType() const{
     assert( this->topPriorityIndex >= 0);
@@ -276,6 +297,7 @@ class AnnotationResult{
   const std::string& getGeneName() const{
     return this->geneName;
   };
+  
   const std::vector<AnnotationType>& getType() const{
     return this->type;
   };
@@ -291,33 +313,60 @@ class AnnotationResult{
 
 class AnnotationOutput{
  public:
+  AnnotationOutput():
+      topPriorityTemplate("$(TOP_TYPE):$[$(ALL_TOP_GENE) |]"),
+      geneTemplate("$(GENE_NAME):$(GENE_STRAND):$[$(TYPE) :]"),
+      fullTemplate("$[$(GENE_ANNOTATION) |]"),
+      annotationResult(NULL),
+      priority(NULL)
+  {
+  };
+  void setAnnotationResult(const std::vector<AnnotationResult>& r) {
+    this->annotationResult = &r;
+    this->buildKeywordDict();
+  };
+  void setPriority(const Priority& p) {
+    this->priority = &p;
+  };
+  void buildKeywordDict() {
+    const std::vector<AnnotationResult>& r = *this->annotationResult;
+    std::vector<std::string> res;
+    int highestPriority = Priority::getLeastPriority();
+    unsigned int highestIdx = 0;
+    for (unsigned int i = 0; i != r.size(); i++) {
+      int p = this->priority->getPriority(r[i].getTopPriorityType());
+      if (p < highestPriority) {
+        highestPriority = p;
+        highestIdx = i;
+        res.clear();
+        res.push_back(r[i].getGeneName());
+      } else if (p == highestPriority) {
+        res.push_back(r[i].getGeneName());
+      }
+    }
+    topPriorityTemplate.add("TOP_GENE", res.size() ? res[0]: AnnotationString[INTERGENIC]);
+    topPriorityTemplate.add("ALL_TOP_GENE", res);
+    topPriorityTemplate.add("TOP_TYPE", this->priority->toString(highestPriority).c_str());
+
+    std::vector<std::string> geneTemplate;
+    std::string perGeneAnnotation;
+    for (unsigned int i = 0; i != r.size(); i++){
+      perGeneAnnotation = r[i].toString(&this->geneTemplate);
+      geneTemplate.push_back(perGeneAnnotation);
+    }
+    fullTemplate.add("GENE_ANNOTATION", geneTemplate);
+  };
   // Format:
   //  Most_priority:gene1|gene2
   std::string getTopPriorityAnnotation(const std::vector<AnnotationResult>& r, const Priority& p) const{
     if (r.size() == 0) {
       return AnnotationString[INTERGENIC];
     };
-
-    std::vector<std::string> res;
-    int highestPriority = Priority::getLeastPriority();
-    unsigned int highestIdx = 0;
-    for (unsigned int i = 0; i != r.size(); i++) {
-      int priority = p.getPriority(r[i].getTopPriorityType());
-      if (priority < highestPriority) {
-        highestPriority = priority;
-        highestIdx = i;
-        res.clear();
-        res.push_back(r[i].getGeneName());
-      } else if (priority == highestPriority) {
-        res.push_back(r[i].getGeneName());
-      }
-      // fprintf(stderr, "highest annotation is %s\n", p.toString(highestPriority).c_str());
+    std::string s;
+    if (this->topPriorityTemplate.translate(&s)) {
+      fprintf(stderr, "topPriorityTemplate failed translation!\n");
     }
-    // return r[highestIdx].getTopPriorityString(p);
-    std::string ret = p.toString(highestPriority).c_str();
-    ret += WITHIN_GENE_SEPARATOR;
-    ret += stringJoin(res, GENE_SEPARATOR);
-    return ret;
+    return s;
   };
 
   std::string getFullAnnotation(const std::vector<AnnotationResult>& r){
@@ -325,13 +374,17 @@ class AnnotationOutput{
       return AnnotationString[INTERGENIC];
     };
     std::string s;
-    for (unsigned int i = 0; i != r.size(); i++){
-      if (i)
-        s += GENE_SEPARATOR;
-      s += r[i].toString();
+    if (this->fullTemplate.translate(&s)) {
+      fprintf(stderr, "fullTemplate failed translation!\n");
     }
     return s;
   };
+ private:
+  StringTemplate topPriorityTemplate;
+  StringTemplate geneTemplate;
+  StringTemplate fullTemplate;
+  const std::vector<AnnotationResult>* annotationResult;
+  const Priority* priority;
 }; // end AnnotationOutput
 
 struct GeneAnnotationParam{
@@ -397,6 +450,8 @@ class GeneAnnotation{
     int ret = this->priority.open(fileName);
     fprintf(stderr, "DONE: %d priority annotation types loaded.\n", ret);
     LOG << "Priority file " << fileName << " load succeed!\n";
+
+    this->outputter.setPriority(this->priority);
     return;
   };
   /**
@@ -408,7 +463,6 @@ class GeneAnnotation{
     assert(fout);
 
     // open input file
-    AnnotationOutput outputter;
     LineReader lr(inputFileName);
     std::vector<std::string> field;
     std::string line;
@@ -429,7 +483,8 @@ class GeneAnnotation{
 
       // real part of annotation
       annotate(chr, pos, ref, alt, &annotationResult);
-
+      outputter.setAnnotationResult(annotationResult);
+      
       // output annotation result
       // VCF info field is the 8th column
       for (unsigned int i = 0; i < field.size(); i++ ){
@@ -437,11 +492,11 @@ class GeneAnnotation{
         fputs(field[i].c_str(), fout) ;
         if (i == 7) { // 7: the 8th column in 0-based index
           if (field[i].size() != 0) {
-            fputc(INFO_SEPARATOR, fout);
+            fputc(VCF_INFO_SEPARATOR, fout);
           }
           fputs(ANNOTATION_START_TAG, fout);
           fputs(outputter.getTopPriorityAnnotation(annotationResult, this->priority).c_str(), fout);
-          fputc(INFO_SEPARATOR, fout);
+          fputc(VCF_INFO_SEPARATOR, fout);
           fputs(ANNOTATION_START_TAG_FULL, fout);
           fputs(outputter.getFullAnnotation(annotationResult).c_str(), fout);
         }
@@ -462,7 +517,6 @@ class GeneAnnotation{
     assert(fout);
 
     // open input file
-    AnnotationOutput outputter;
     LineReader lr(inputFileName);
     std::vector<std::string> field;
     std::string line;
@@ -483,6 +537,7 @@ class GeneAnnotation{
 
       // real part of annotation
       annotate(chr, pos, ref, alt, &annotationResult);
+      outputter.setAnnotationResult(annotationResult);
 
       // output annotation result
       // VCF info field is the 8th column
@@ -512,7 +567,6 @@ class GeneAnnotation{
     assert(fout);
 
     // open input file
-    AnnotationOutput outputter;
     LineReader lr(inputFileName);
     std::vector<std::string> field;
     std::string line;
@@ -557,6 +611,7 @@ class GeneAnnotation{
 
       // real part of annotation
       annotate(chr, pos, ref, alt, &annotationResult);
+      outputter.setAnnotationResult(annotationResult);
 
       // output annotation result
       // VCF info field is the 8th column
@@ -1243,8 +1298,9 @@ class GeneAnnotation{
   bool allowMixedVariation;       // VCF ALT field may have more than one variation e..g A,C
 
   std::vector<AnnotationResult> annotationResult;
+  AnnotationOutput outputter;               // control output format
 
-  FreqTable<AnnotationType> annotationTypeFreq;                   // base change frequency
+  FreqTable<AnnotationType> annotationTypeFreq;                 // base change frequency
   FreqTable<AnnotationType> topPriorityAnnotationTypeFreq;      // base change frequency of top priority
   FreqTable<std::string> baseFreq;                              // base change frequency
   FreqTable<std::string> codonFreq;                             // codon change frequency

@@ -10,7 +10,7 @@ release: $(EXEC)
 debug: CXXFLAGS = -ggdb -O0 $(DEFAULT_CXXFLAGS)
 debug: $(EXEC)
 
-$(EXEC): Main.cpp Gene.h Range.h IO.h Argument.h FreqTable.h GenomeSequence.h LogFile.h
+$(EXEC): Main.cpp Gene.h Range.h IO.h Argument.h FreqTable.h GenomeSequence.h LogFile.h StringTemplate.h
 	g++ $(CXXFLAGS) -c Main.cpp
 	g++ $(CXXFLAGS) -o $@ Main.o -lz -lbz2 -lssl -lcrypto
 clean:
@@ -35,12 +35,12 @@ check:
 	diff example/test.plain.anno.txt example/correct.test.plain.anno.txt 
 
 correct:
-	@echo "regenerate correct testing files..."
+	@echo "WARNING: Regenerate correct testing files. You have 10 seconds to stop..."
 	sleep 10
 	(cd example; ../executable/$(EXEC) -i test.vcf -r test.fa -g test.gene.txt -c ../codon.txt -o correct.test.out.vcf)
 	(cd example; ../executable/$(EXEC) -i 100.vcf.gz -r test.fa -g ../resources/refFlat_hg19.txt.gz -c ../codon.txt -o correct.noref.100.out.vcf)
 	(cd example; ../executable/$(EXEC) -i 100.vcf.gz -r ../resources/human.g1k.v37.fa -g ../resources/refFlat_hg19.txt.gz -c ../codon.txt -o correct.100.out.vcf)
-	(cd example; ../executable/$(EXEC) -i test.plain.txt -r test.fa -g test.gene.txt -c ../codon.txt -o correct.test.plain.anno.txt)
+	(cd example; ../executable/$(EXEC) --inputFormat plain -i test.plain.txt -r test.fa -g test.gene.txt -c ../codon.txt -o correct.test.plain.anno.txt)
 
 # auxillary tools
 Log: LogFile.cpp LogFile.h
