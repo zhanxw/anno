@@ -656,14 +656,10 @@ class GeneAnnotation{
       sep = field[0].find_first_of(" _\t", beg);
       std::string alt = toUpper(field[0].substr(beg, sep - beg));
 
-      LOG << chr;
-      LOG << "\n";
-      LOG << pos;
-      LOG << "\n";
-      LOG << ref;
-      LOG << "\n";
-      LOG << alt;
-      LOG << "\n";
+      if (chr == "" || pos <= 0 || ref == "" || alt == "") {
+        fprintf(stderr, "Skip line: %s ...." , field[0].c_str());
+        LOG << "Skip: " << field[0];
+      }
       // real part of annotation
       annotate(chr, pos, ref, alt, &annotationResult);
       outputter.setAnnotationResult(annotationResult);
