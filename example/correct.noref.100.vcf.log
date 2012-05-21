@@ -1,0 +1,14 @@
+Analysis program [ ../anno ] started on Mon May 21 11:17:24 2012
+# ParameterList created by zhanxw on dumbo at Mon May 21 11:17:24 2012
+-i "input.100.vcf.gz" -o "correct.noref.100.vcf" -g "../resources/refFlat_hg19.txt.gz" -r "test.fa" -c "../codon.txt"
+Reference genome file test.fa loads succeed!
+Codon file ../codon.txt loads succeed!
+Priority file /net/fantasia/home/zhanxw/anno/priority.txt load succeed!
+Gene file ../resources/refFlat_hg19.txt.gz loads succeed!
+Annotate input.100.vcf.gz to correct.noref.100.vcf succeed!
+Generate frequency of each annotation type in correct.noref.100.vcf.anno.frq succeed!
+Generate frequency of high priority for highest priority annotation type in correct.noref.100.vcf.top.anno.frq succeed!
+Generate frequency of each base change in correct.noref.100.vcf.base.frq succeed!
+Generate frequency of each codon change in correct.noref.100.vcf.codon.frq succeed!
+Generate frequency of indel length in correct.noref.100.vcf.indel.frq succeed!
+Analysis succeeded in 2 second(s) and finished at Mon May 21 11:17:26 2012

@@ -1,0 +1,14 @@
+Stop_Loss	9
+Downstream	20
+Start_Loss	23
+Upstream	78
+Stop_Gain	153
+Essential_Splice_Site	250
+Utr5	525
+Noncoding	580
+Utr3	924
+Normal_Splice_Site	1623
+Synonymous	7736
+Nonsynonymous	9764
+Intron	13857
+Exon	19714

@@ -18,42 +18,42 @@ clean:
 # basic test
 test1: debug
 	(cd example; ../$(EXEC) -i input.test.vcf -r test.fa -g test.gene.txt -c ../codon.txt -o output.test.vcf)
-	diff {correct,output}.test.vcf
+	(cd example; diff {correct,output}.test.vcf)
 
 test2: debug
 	(cd example; ../$(EXEC) -i input.100.vcf.gz -r test.fa -g ../resources/refFlat_hg19.txt.gz -c ../codon.txt -o output.noref.100.vcf)
-	diff {correct,output}.noref.100.vcf
+	(cd example; diff {correct,output}.noref.100.vcf)
 
 test3: debug
 	(cd example; ../$(EXEC) -i input.100.vcf.gz -r ../resources/human.g1k.v37.fa -g ../resources/refFlat_hg19.txt.gz -c ../codon.txt -o output.100.vcf)
-	diff {correct,output}.100.vcf
+	(cd example; diff {correct,output}.100.vcf)
 
 # test plain text file annotation
 test4: debug
 	(cd example; ../$(EXEC) --inputFormat plain -i input.test.plain.txt -r test.fa -g test.gene.txt -c ../codon.txt -o output.test.plain.txt --inputFormat plain)
-	diff {correct,output}.test.plain.txt
+	(cd example; diff {correct,output}.test.plain.txt)
 
 # test refGene format
 test5: debug
 	(cd example; ../$(EXEC) -i input.100.vcf.gz -r ../resources/human.g1k.v37.fa -f refGene -g ../resources/refGene.txt.gz -c ../codon.txt -o output.100.refGene.vcf)
-	diff {correct,output}.100.refGene.vcf
+	(cd example; diff {correct,output}.100.refGene.vcf)
 
 # test epacts annotation
 test6: debug
 	(cd example; ../$(EXEC) -i input.epacts --inputFormat epacts -r ../resources/human.g1k.v37.fa -f refGene -g ../resources/refGene.txt.gz -c ../codon.txt -o output.epacts)
-	diff {correct,output}.epacts
+	(cd example; diff {correct,output}.epacts)
 
 test: test1 test2 test3 test4 test5 test6
 
 correct:
 	@echo "WARNING: Regenerate correct testing files. You have 10 seconds to stop..."
 	sleep 10
-	(cd example; ../$(EXEC) -i input.test.vcf -r test.fa -g test.gene.txt -c ../codon.txt -o output.test.vcf)
-	(cd example; ../$(EXEC) -i input.100.vcf.gz -r test.fa -g ../resources/refFlat_hg19.txt.gz -c ../codon.txt -o output.noref.100.vcf)
-	(cd example; ../$(EXEC) -i input.100.vcf.gz -r ../resources/human.g1k.v37.fa -g ../resources/refFlat_hg19.txt.gz -c ../codon.txt -o output.100.vcf)
-	(cd example; ../$(EXEC) --inputFormat plain -i input.test.plain.txt -r test.fa -g test.gene.txt -c ../codon.txt -o output.test.plain.txt --inputFormat plain)
-	(cd example; ../$(EXEC) -i input.100.vcf.gz -r ../resources/human.g1k.v37.fa -f refGene -g ../resources/refGene.txt.gz -c ../codon.txt -o output.100.refGene.vcf)
-	(cd example; ../$(EXEC) -i input.epacts --inputFormat epacts -r ../resources/human.g1k.v37.fa -f refGene -g ../resources/refGene.txt.gz -c ../codon.txt -o output.epacts)
+	(cd example; ../$(EXEC) -i input.test.vcf -r test.fa -g test.gene.txt -c ../codon.txt -o correct.test.vcf)
+	(cd example; ../$(EXEC) -i input.100.vcf.gz -r test.fa -g ../resources/refFlat_hg19.txt.gz -c ../codon.txt -o correct.noref.100.vcf)
+	(cd example; ../$(EXEC) -i input.100.vcf.gz -r ../resources/human.g1k.v37.fa -g ../resources/refFlat_hg19.txt.gz -c ../codon.txt -o correct.100.vcf)
+	(cd example; ../$(EXEC) --inputFormat plain -i input.test.plain.txt -r test.fa -g test.gene.txt -c ../codon.txt -o correct.test.plain.txt --inputFormat plain)
+	(cd example; ../$(EXEC) -i input.100.vcf.gz -r ../resources/human.g1k.v37.fa -f refGene -g ../resources/refGene.txt.gz -c ../codon.txt -o correct.100.refGene.vcf)
+	(cd example; ../$(EXEC) -i input.epacts --inputFormat epacts -r ../resources/human.g1k.v37.fa -f refGene -g ../resources/refGene.txt.gz -c ../codon.txt -o correct.epacts)
 	# (cd example; ../executable/$(EXEC) -i input.test.vcf -r test.fa -g test.gene.txt -c ../codon.txt -o correct.test.vcf)
 	# (cd example; ../executable/$(EXEC) -i input.100.vcf.gz -r test.fa -g ../resources/refFlat_hg19.txt.gz -c ../codon.txt -o correct.noref.100.vcf)
 	# (cd example; ../executable/$(EXEC) -i input.100.vcf.gz -r ../resources/human.g1k.v37.fa -g ../resources/refFlat_hg19.txt.gz -c ../codon.txt -o correct.100.vcf)
