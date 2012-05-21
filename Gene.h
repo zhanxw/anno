@@ -14,7 +14,7 @@ class Gene{
         std::vector< std::string > exon_beg;
         std::vector< std::string > exon_end;
         int nf = stringTokenize(line, "\t", &field);
-        if (nf != format.size()) { 
+        if (nf != format.getExpectedColumn()) { 
             static int nTimeError = 0;
             fprintf(stderr, "Unable to read this gene from: %s\n", line);
             if (nTimeError++ > 10) {

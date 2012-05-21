@@ -83,12 +83,12 @@ public:
     this->info = chrom.info;
   };
 public:
-  char operator[] (int offset) const {
+  char operator[] (unsigned int offset) const {
     int lineNo = offset / info->basePerLine;
     int remainder = offset % info->basePerLine;
-    int pos = info->offset + lineNo * info->bytePerLine + remainder;
+    unsigned int pos = info->offset + lineNo * info->bytePerLine + remainder;
     if ( fseek(fp, pos, SEEK_SET) ) {
-      fprintf(stderr, "Cannot fseek()!\n");
+      fprintf(stderr, "Cannot fseek() at position %d!\n", pos);
       return 'N';
     }
     char c;

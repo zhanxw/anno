@@ -27,6 +27,10 @@ test3: debug
 test4: debug
 	(cd example; ../$(EXEC) --inputFormat plain -i test.plain.txt -r test.fa -g test.gene.txt -c ../codon.txt -o test.plain.anno.txt --inputFormat plain)
 
+# test refGene format
+test5: debug
+	(cd example; ../$(EXEC) -i 100.vcf.gz -r ../resources/human.g1k.v37.fa -f refGene -g ../resources/refGene.txt.gz -c ../codon.txt -o 100.out.refGene.vcf)
+
 test: test1 test2 test3 test4
 check:
 	diff example/test.out.vcf example/correct.test.out.vcf && \

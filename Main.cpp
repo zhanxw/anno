@@ -262,6 +262,9 @@ class AnnotationResult{
   // };
 
   AnnotationType getTopPriorityType() const{
+    if (this->type.size() == 0) {
+      return INTERGENIC;
+    }
     assert( this->topPriorityIndex >= 0);
     return this->type[this->topPriorityIndex];
   };
@@ -377,12 +380,19 @@ class GeneAnnotation{
  public:
   GeneAnnotation():allowMixedVariation(false){};
   void setFormat(const std::string& f) {
-    if (f == "refFlat") {
+    std::string s = f;
+    for (unsigned int i = 0; i < s.size(); i++) {
+      s[i] = tolower(s[i]);
+    };
+    if (s == "refflat") {
       this->format.setRefFlatFormat();
-    } else if (f == "knownGene") {
+    } else if (s == "knowngene") {
       this->format.setUCSCKnownGeneFormat();
+    } else if (s == "refgene") {
+      this->format.setRefGeneFormat();      
     } else {
-      fprintf(stderr, "Unknown format!\nNow quitting...\n");
+      fprintf(stderr, "Unknown format (other than refFlat, knownGene, refGene)!\nNow quitting...\n");
+      abort();
     }
   };
   void openGeneFile(const char* geneFileName){
@@ -642,6 +652,8 @@ class GeneAnnotation{
     LOG << "Generate frequency of indel length in " << ofs << " succeed!\n";
   };
   // annotation will find all overlapping gene, and call annotateByGene for each gene
+  // results will be stored in @param annotationResult
+  // priority will also be calculated in annotationResult
   void annotate(const std::string& chrom,
                 const int pos,
                 const std::string& ref,
@@ -1294,7 +1306,7 @@ int main(int argc, char *argv[])
       ADD_PARAMETER_GROUP(pl, "Optional Parameters")
       ADD_STRING_PARAMETER(pl, inputFormat, "--inputFormat", "Specify format (default: vcf). \"-f plain \" will use first 4 columns as chrom, pos, ref, alt")
       ADD_STRING_PARAMETER(pl, referenceFile, "-r", "Specify reference genome position")
-      ADD_STRING_PARAMETER(pl, geneFileFormat, "-f", "Specify gene file format (default: refFlat, other options knownGene)")
+      ADD_STRING_PARAMETER(pl, geneFileFormat, "-f", "Specify gene file format (default: refFlat, other options: knownGene, refGene)")
       ADD_STRING_PARAMETER(pl, priorityFile, "-p", "Specify priority of annotations")
       ADD_STRING_PARAMETER(pl, codonFile, "-c", "Specify codon file (default: codon.txt)")
       ADD_INT_PARAMETER(pl, upstreamRange, "-u", "Specify upstream range (default: 50)")
