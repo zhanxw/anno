@@ -103,7 +103,7 @@ std::string toUpper(const std::string& s) {
 std::string toLower(const std::string& s) {
     std::string r;
     for (unsigned int i = 0; i < s.size(); i++) {
-        r.push_back(toupper(s[i]));
+        r.push_back(tolower(s[i]));
     }
     return r;
 };

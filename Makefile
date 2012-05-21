@@ -31,7 +31,11 @@ test4: debug
 test5: debug
 	(cd example; ../$(EXEC) -i 100.vcf.gz -r ../resources/human.g1k.v37.fa -f refGene -g ../resources/refGene.txt.gz -c ../codon.txt -o 100.out.refGene.vcf)
 
-test: test1 test2 test3 test4
+# test epacts annotation
+test6: debug
+	(cd example; ../$(EXEC) -i epacts.input --inputFormat epacts -r ../resources/human.g1k.v37.fa -f refGene -g ../resources/refGene.txt.gz -c ../codon.txt -o epacts.output)
+
+test: test1 test2 test3 test4 
 check:
 	diff example/test.out.vcf example/correct.test.out.vcf && \
 	diff example/noref.100.out.vcf example/correct.noref.100.out.vcf && \

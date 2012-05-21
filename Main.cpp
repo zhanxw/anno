@@ -380,10 +380,7 @@ class GeneAnnotation{
  public:
   GeneAnnotation():allowMixedVariation(false){};
   void setFormat(const std::string& f) {
-    std::string s = f;
-    for (unsigned int i = 0; i < s.size(); i++) {
-      s[i] = tolower(s[i]);
-    };
+    std::string s = toLower(f);
     if (s == "refflat") {
       this->format.setRefFlatFormat();
     } else if (s == "knowngene") {
@@ -490,11 +487,12 @@ class GeneAnnotation{
     // close output
     fclose(fout);
     fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
+    fprintf(stdout, "DONE: Generated annotation output in [ %s ].\n", outputFileName);
     LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
 
     // output stats
     this->outputAnnotationStats(outputFileName);
-  }
+  } // annotateVCF
   void annotatePlain(const char* inputFileName, const char* outputFileName){
     // open output file
     FILE* fout = fopen(outputFileName, "wt");
@@ -537,11 +535,12 @@ class GeneAnnotation{
     // close output
     fclose(fout);
     fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
+    fprintf(stdout, "DONE: Generated annotation output in [ %s ].\n", outputFileName);
     LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
 
     // output stats
     this->outputAnnotationStats(outputFileName);
-  }
+  } // annotatePlain
   // plink associated results (.assoc files)
   // NOTE: ref and alt allelel need to get from reference
   //    1   1:196404269  196404269    A       19        0    G         6.61      0.01014           NA
@@ -611,11 +610,86 @@ class GeneAnnotation{
     // close output
     fclose(fout);
     fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
+    fprintf(stdout, "DONE: Generated annotation output in [ %s ].\n", outputFileName);
     LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
 
     // output stats
     this->outputAnnotationStats(outputFileName);
-  }
+  } // annotatePlink
+  // epacts input:
+  // NOTE: ref and alt allelel need to get from reference
+  //    1   1:196404269  196404269    A       19        0    G         6.61      0.01014           NA
+  void annotateEpacts(const char* inputFileName, const char* outputFileName){
+    // open output file
+    FILE* fout = fopen(outputFileName, "wt");
+    assert(fout);
+
+    // open input file
+    LineReader lr(inputFileName);
+    std::vector<std::string> field;
+    std::string line;
+    int totalVariants = 0;
+    while(lr.readLine(&line) > 0) {
+      if (line.size() == 0 || line[0] == '#') {
+        fputs(line.c_str(), fout);
+        fputc('\n', fout);
+        continue;
+      }
+      stringNaturalTokenize(line, " \t", &field);
+      if (field.size() < 1) continue;
+      totalVariants++;
+
+      // find
+      int beg = 0;
+      int sep = field[0].find(':', beg);
+      std::string chr = field[0].substr(beg, sep - beg);
+      
+      beg = sep + 1;
+      sep = field[0].find('_', beg);
+      int pos = toInt(field[0].substr(beg, sep - beg));
+
+      beg = sep + 1;
+      sep = field[0].find('/', beg);
+      std::string ref = toUpper(field[0].substr(beg, sep - beg));
+
+      beg = sep + 1;
+      sep = field[0].find_first_of(" _\t", beg);
+      std::string alt = toUpper(field[0].substr(beg, sep - beg));
+
+      LOG << chr;
+      LOG << "\n";
+      LOG << pos;
+      LOG << "\n";
+      LOG << ref;
+      LOG << "\n";
+      LOG << alt;
+      LOG << "\n";
+      // real part of annotation
+      annotate(chr, pos, ref, alt, &annotationResult);
+      outputter.setAnnotationResult(annotationResult);
+                                
+      // output annotation result
+      fputs(field[0].substr(0, sep).c_str(), fout);
+      fputc('_', fout);
+      fputs(outputter.getTopPriorityAnnotation(annotationResult, this->priority).c_str(), fout);
+      // fputs("\t", fout);
+      // fputs(outputter.getFullAnnotation(annotationResult).c_str(), fout);
+
+      for (unsigned int i = 1; i < field.size(); i++ ){
+        fputs("\t", fout);        
+        fputs(field[i].c_str(), fout) ;
+      }
+      fputc('\n', fout);
+    }
+    // close output
+    fclose(fout);
+    fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
+    fprintf(stdout, "DONE: Generated annotation output in [ %s ].\n", outputFileName);
+    LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
+
+    // output stats
+    this->outputAnnotationStats(outputFileName);
+  } // annotateEpacts
   void outputAnnotationStats(const char* outputFileName) {
     // output frequency files
     std::string fn = outputFileName;
@@ -1370,12 +1444,14 @@ int main(int argc, char *argv[])
 
   ga.setFormat(FLAG_geneFileFormat);
   ga.openGeneFile(FLAG_geneFile.c_str());
-  if (toLower(FLAG_inputFormat) == "VCF" || FLAG_inputFormat.size() == 0) {
+  if (toLower(FLAG_inputFormat) == "vcf" || FLAG_inputFormat.size() == 0) {
     ga.annotateVCF(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
-  } else if (toLower(FLAG_inputFormat) == "PLAIN") {
+  } else if (toLower(FLAG_inputFormat) == "plain") {
     ga.annotatePlain(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
-  } else if (toLower(FLAG_inputFormat) == "PLINK") {
+  } else if (toLower(FLAG_inputFormat) == "plink") {
     ga.annotatePlink(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
+  } else if (toLower(FLAG_inputFormat) == "epacts") {
+    ga.annotateEpacts(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
   } else{
     fprintf(stderr, "Cannot recognize input file format: %s \n", FLAG_inputFile.c_str());
     abort();
