@@ -7,7 +7,8 @@ public:
   void setRefFlatFormat(){
     this->nameCol.clear();
     this->nameCol.push_back(0);
-    this->nameCol.push_back(1);
+    if (!this->skipTranscriptName)
+      this->nameCol.push_back(1);
     this->chrCol = 2;
     this->strandCol = 3;
     this->txStartCol = 4;
@@ -18,11 +19,13 @@ public:
     this->exonStartCol = 9;
     this->exonEndCol = 10;
 
-    this->expectedColumn = 9 + this->nameCol.size();
+    this->expectedColumn = 11;
   };
   void setUCSCKnownGeneFormat(){
     this->nameCol.clear();
     this->nameCol.push_back(10);
+    if (!this->skipTranscriptName)
+      this->nameCol.push_back(1);
     this->nameCol.push_back(0);
     this->chrCol = 1;
     this->strandCol = 2;
@@ -34,11 +37,13 @@ public:
     this->exonStartCol = 8;
     this->exonEndCol = 9;
 
-    this->expectedColumn = 9 + this->nameCol.size();
+    this->expectedColumn = 11;
   };
   void setRefGeneFormat() {
     this->nameCol.clear();
     this->nameCol.push_back(12);
+    if (!this->skipTranscriptName)
+      this->nameCol.push_back(1);
     this->nameCol.push_back(1);
     this->chrCol = 2;
     this->strandCol = 3;
@@ -55,6 +60,17 @@ public:
   int getExpectedColumn() const {
     return this->expectedColumn;
   };
+  /**
+   * Optionally hide or show transcript names
+   * NOTE: call these before set any other formats.
+   */
+  void hideTranscriptName() {
+    this->skipTranscriptName = true;
+  };
+  void showTranscriptName() {
+    this->skipTranscriptName = false;
+  };
+  
 public:
   std::vector<int> nameCol;
   int chrCol;
@@ -67,6 +83,8 @@ public:
   int exonStartCol;
   int exonEndCol;
   int expectedColumn;
+
+  bool skipTranscriptName;
 };
 
 #endif /* _GENEFORMAT_H_ */

@@ -379,7 +379,9 @@ struct GeneAnnotationParam{
 class GeneAnnotation{
  public:
   GeneAnnotation():allowMixedVariation(false){};
-  void setFormat(const std::string& f) {
+  void setFormat(const std::string& f, bool hideTranscriptName) {
+    if (hideTranscriptName) 
+      this->format.hideTranscriptName();
     std::string s = toLower(f);
     if (s == "refflat") {
       this->format.setRefFlatFormat();
@@ -1383,6 +1385,7 @@ int main(int argc, char *argv[])
       ADD_INT_PARAMETER(pl, downstreamRange, "-d", "Specify downstream range (default: 50)")
       ADD_INT_PARAMETER(pl, spliceIntoExon, "--se", "Specify splice into extron range (default: 3)")
       ADD_INT_PARAMETER(pl, spliceIntoIntron, "--si", "Specify splice into intron range (default: 8)")
+      ADD_BOOL_PARAMETER(pl, hideTranscriptName, "--hideTranscriptName", "Hide transcript name when output annotation")      
       END_PARAMETER_LIST(pl)
       ;
 
@@ -1438,7 +1441,12 @@ int main(int argc, char *argv[])
   ga.openCodonFile(FLAG_codonFile.c_str());
   ga.openPriorityFile(FLAG_priorityFile.c_str());
 
-  ga.setFormat(FLAG_geneFileFormat);
+  if (FLAG_hideTranscriptName) {
+    fprintf(stderr, "Hide transcript names.\n");
+    ga.setFormat(FLAG_geneFileFormat, true);
+  } else {
+    ga.setFormat(FLAG_geneFileFormat, false);
+  }
   ga.openGeneFile(FLAG_geneFile.c_str());
   if (toLower(FLAG_inputFormat) == "vcf" || FLAG_inputFormat.size() == 0) {
     ga.annotateVCF(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
