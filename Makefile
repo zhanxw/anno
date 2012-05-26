@@ -67,3 +67,7 @@ Log: LogFile.cpp LogFile.h
 
 testStringTemplate: testStringTemplate.cpp StringTemplate.h
 	g++ -g -o $@ $<
+
+doc:
+	java -jar ext/wiki2html.jar README.wiki > README.html 
+	pandoc -f html -t markdown README.html > README.md 
