@@ -1,5 +1,5 @@
-Analysis program [ ../anno ] started on Mon May 21 11:17:28 2012
-# ParameterList created by zhanxw on dumbo at Mon May 21 11:17:28 2012
+Analysis program [ ../anno ] started on Wed May 30 10:20:28 2012
+# ParameterList created by zhanxw on dumbo at Wed May 30 10:20:28 2012
 -i "input.test.plain.txt" -o "correct.test.plain.txt" -g "test.gene.txt" --inputFormat "plain" -r "test.fa" -c "../codon.txt"
 Reference genome file test.fa loads succeed!
 Codon file ../codon.txt loads succeed!
@@ -11,4 +11,4 @@ Generate frequency of high priority for highest priority annotation type in corr
 Generate frequency of each base change in correct.test.plain.txt.base.frq succeed!
 Generate frequency of each codon change in correct.test.plain.txt.codon.frq succeed!
 Generate frequency of indel length in correct.test.plain.txt.indel.frq succeed!
-Analysis succeeded in 0 second(s) and finished at Mon May 21 11:17:28 2012
+Analysis succeeded in 0 second(s) and finished at Wed May 30 10:20:28 2012

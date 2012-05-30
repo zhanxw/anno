@@ -3,8 +3,8 @@ Stop_Loss	1
 Utr5	2
 Utr3	2
 CodonRegion	2
-CodonGain	2
 Frameshift	2
+CodonGain	2
 StructuralVariation	3
 Noncoding	3
 Synonymous	4

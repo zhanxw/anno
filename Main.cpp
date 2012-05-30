@@ -157,7 +157,7 @@ struct Priority{
     }
   };
   /**
-   * @return  @param priority
+   * @return the string representation of @param priority
    */
   std::string toString(const int priority) const {
     std::string s;
@@ -190,33 +190,14 @@ class AnnotationResult{
     this->detail.clear();
     this->topPriorityIndex = -1;
   };
-  std::string toString(StringTemplate* t) const{
-    std::vector<std::string> type;
-    std::string s;
-    for (int i = 0; i < this->type.size(); i++) {
-      s =  AnnotationString[this->type[i]];
-      // for synonymous or non-synonymous, we may output details
-      std::map<AnnotationType, std::string>::const_iterator iter;
-      iter = this->detail.find(this->type[i]);
-      if (iter != this->detail.end()) {
-        s += iter->second;
-      }
-      type.push_back(s);
-    }
-    t->add("GENE_NAME", this->geneName);
-    t->add("GENE_STRAND", isForwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING);
-    t->add("TYPE", type);
-
-    t->translate(&s);
-    return s;
-  };
 
   void add(const Gene& g){
     if (this->type.size() != 0) {
       // we usually record gene name and its strand first
       fprintf(stderr, "Something weired happen\n");
     }
-    this->geneName = g.name;
+    this->geneName = g.geneName;
+    this->transcriptName = g.transcriptName;
     this->isForwardStrand = g.forwardStrand;
     //this->data.push_back(g.forwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING);
   };
@@ -274,20 +255,35 @@ class AnnotationResult{
   const std::string& getGeneName() const{
     return this->geneName;
   };
-
+  const std::string& getTranscriptName() const {
+    return this->transcriptName;
+  };
+  const std::string getFullName() const {
+    return this->geneName + "/" + this->transcriptName;
+  };
   const std::vector<AnnotationType>& getType() const{
     return this->type;
   };
-
+  const std::map<AnnotationType, std::string>& getDetail() const {
+    return this->detail;
+  };
+  bool hasForwardStrand() const {
+    return this->isForwardStrand;
+  };
 
  private:
   std::string geneName;
+  std::string transcriptName;
   bool isForwardStrand;
   std::vector<AnnotationType> type;
   std::map<AnnotationType, std::string> detail;
   int topPriorityIndex;  // this->type[this->topPriorityIndex] has top priority; <0, means unknown
 }; // end AnnotationResult
 
+/**
+ * AnnotationOutput links the class AnnotationResult to a string representation
+ * It contain a string templates.
+ */
 class AnnotationOutput{
  public:
   AnnotationOutput():
@@ -321,15 +317,17 @@ class AnnotationOutput{
         res.push_back(r[i].getGeneName());
       }
     }
+
+    // only keep unique gene names
+    inplace_make_set(&res);
+    
     topPriorityTemplate.add("TOP_GENE", res.size() ? res[0]: AnnotationString[INTERGENIC]);
     topPriorityTemplate.add("ALL_TOP_GENE", res);
     topPriorityTemplate.add("TOP_TYPE", this->priority->toString(highestPriority).c_str());
 
     std::vector<std::string> geneTemplate;
-    std::string perGeneAnnotation;
     for (unsigned int i = 0; i != r.size(); i++){
-      perGeneAnnotation = r[i].toString(&this->geneTemplate);
-      geneTemplate.push_back(perGeneAnnotation);
+      geneTemplate.push_back(getGeneAnnotation(r[i]));
     }
     fullTemplate.add("GENE_ANNOTATION", geneTemplate);
   };
@@ -356,6 +354,42 @@ class AnnotationOutput{
     }
     return s;
   };
+
+  // get per gene annotation
+  std::string getGeneAnnotation(const AnnotationResult& res){
+    const std::vector<AnnotationType>& type = res.getType();
+    const std::map<AnnotationType, std::string>& detail = res.getDetail();
+  
+    std::vector<std::string> args;
+    std::string s;
+    for (int i = 0; i < type.size(); i++) {
+      s =  AnnotationString[type[i]];
+      // for synonymous or non-synonymous, we may output details
+      std::map<AnnotationType, std::string>::const_iterator iter;
+      iter = detail.find(type[i]);
+      if (iter != detail.end()) {
+        s += iter->second;
+      }
+      args.push_back(s);
+    }
+
+    this->geneTemplate.add("GENE_NAME", res.getFullName());
+    this->geneTemplate.add("GENE_STRAND", res.hasForwardStrand() ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING);
+    this->geneTemplate.add("TYPE", args);
+
+    this->geneTemplate.translate(&s);
+
+    return s;
+  };
+
+  int inplace_make_set(std::vector<std::string>* input) {
+    std::vector<std::string>& v = * input;
+    std::sort(v.begin(), v.end());
+    std::vector<std::string>::iterator it;
+    it = std::unique(v.begin(), v.end());
+    v.resize( it - v.begin());
+    return v.size();
+  };
  private:
   StringTemplate topPriorityTemplate;
   StringTemplate geneTemplate;
@@ -379,9 +413,7 @@ struct GeneAnnotationParam{
 class GeneAnnotation{
  public:
   GeneAnnotation():allowMixedVariation(false){};
-  void setFormat(const std::string& f, bool hideTranscriptName) {
-    if (hideTranscriptName) 
-      this->format.hideTranscriptName();
+  void setFormat(const std::string& f) {
     std::string s = toLower(f);
     if (s == "refflat") {
       this->format.setRefFlatFormat();
@@ -1386,7 +1418,6 @@ int main(int argc, char *argv[])
       ADD_INT_PARAMETER(pl, downstreamRange, "-d", "Specify downstream range (default: 50)")
       ADD_INT_PARAMETER(pl, spliceIntoExon, "--se", "Specify splice into extron range (default: 3)")
       ADD_INT_PARAMETER(pl, spliceIntoIntron, "--si", "Specify splice into intron range (default: 8)")
-      ADD_BOOL_PARAMETER(pl, hideTranscriptName, "--hideTranscriptName", "Hide transcript name when output annotation")      
       END_PARAMETER_LIST(pl)
       ;
 
@@ -1442,12 +1473,7 @@ int main(int argc, char *argv[])
   ga.openCodonFile(FLAG_codonFile.c_str());
   ga.openPriorityFile(FLAG_priorityFile.c_str());
 
-  if (FLAG_hideTranscriptName) {
-    fprintf(stderr, "Hide transcript names.\n");
-    ga.setFormat(FLAG_geneFileFormat, true);
-  } else {
-    ga.setFormat(FLAG_geneFileFormat, false);
-  }
+  ga.setFormat(FLAG_geneFileFormat);
   ga.openGeneFile(FLAG_geneFile.c_str());
   if (toLower(FLAG_inputFormat) == "vcf" || FLAG_inputFormat.size() == 0) {
     ga.annotateVCF(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());

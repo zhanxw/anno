@@ -1,5 +1,5 @@
-Analysis program [ ../anno ] started on Mon May 21 11:17:26 2012
-# ParameterList created by zhanxw on dumbo at Mon May 21 11:17:26 2012
+Analysis program [ ../anno ] started on Wed May 30 10:20:26 2012
+# ParameterList created by zhanxw on dumbo at Wed May 30 10:20:26 2012
 -i "input.100.vcf.gz" -o "correct.100.vcf" -g "../resources/refFlat_hg19.txt.gz" -r "../resources/human.g1k.v37.fa" -c "../codon.txt"
 Reference genome file ../resources/human.g1k.v37.fa loads succeed!
 Codon file ../codon.txt loads succeed!
@@ -11,4 +11,4 @@ Generate frequency of high priority for highest priority annotation type in corr
 Generate frequency of each base change in correct.100.vcf.base.frq succeed!
 Generate frequency of each codon change in correct.100.vcf.codon.frq succeed!
 Generate frequency of indel length in correct.100.vcf.indel.frq succeed!
-Analysis succeeded in 2 second(s) and finished at Mon May 21 11:17:28 2012
+Analysis succeeded in 2 second(s) and finished at Wed May 30 10:20:28 2012

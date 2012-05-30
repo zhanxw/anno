@@ -14,7 +14,7 @@ class Gene{
         std::vector< std::string > exon_beg;
         std::vector< std::string > exon_end;
         int nf = stringTokenize(line, "\t", &field);
-        if (nf != format.getExpectedColumn()) { 
+        if (nf < format.getMinimumExpectedColumn()) { 
             static int nTimeError = 0;
             fprintf(stderr, "Unable to read this gene from: %s\n", line);
             if (nTimeError++ > 10) {
@@ -24,11 +24,19 @@ class Gene{
             return;
         }
         // read name
-        for (unsigned int i = 0; i < format.nameCol.size(); i++) {
+        this->geneName.clear();
+        for (unsigned int i = 0; i < format.geneNameCol.size(); i++) {
             if (i) {
-                this->name += "/";
+                this->geneName += "/";
             }
-            this->name += field[format.nameCol[i]];
+            this->geneName += field[format.geneNameCol[i]];
+        }
+        this->transcriptName.clear();
+        for (unsigned int i = 0; i < format.transcriptNameCol.size(); i++) {
+            if (i) {
+                this->transcriptName += "/";
+            }
+            this->transcriptName += field[format.transcriptNameCol[i]];
         }
         // read others
         this->chr = chopChr(field[format.chrCol]);
@@ -418,7 +426,8 @@ class Gene{
         return (end - beg + 1);
     };
   public:
-    std::string name;
+    std::string geneName;
+    std::string transcriptName;
     std::string chr;
     bool forwardStrand;
     Range tx;
