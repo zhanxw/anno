@@ -661,6 +661,7 @@ class GeneAnnotation{
       if (chr == "" || pos <= 0 || ref == "" || alt == "") {
         fprintf(stderr, "Skip line: %s ...." , field[0].c_str());
         LOG << "Skip: " << field[0];
+        continue;
       }
       // real part of annotation
       annotate(chr, pos, ref, alt, &annotationResult);
