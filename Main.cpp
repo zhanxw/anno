@@ -23,13 +23,15 @@
 
 void banner(FILE* fp) {
   const char* string =
-      "..............................................       \n"
-      " ...      Anno(tation)                       ...     \n"
-      "  ...      Xiaowei Zhan, Goncalo Abecasis     ...    \n"
-      "   ...      zhanxw@umich.edu                    ...  \n"
-      "    ...      Jun 2011                            ... \n"
-      "     ................................................\n"
-      "                                                     \n"
+      "..............................................         \n"
+      " ...      Anno(tation)                       ...       \n"
+      "  ...      Xiaowei Zhan, Goncalo Abecasis     ...      \n"
+      "   ...      Speical Thanks:                    ...     \n"
+      "    ...      Hyun Ming Kang, Yanming Li         ...    \n"
+      "     ...      zhanxw@umich.edu                    ...  \n"
+      "      ...      Jun 2011                            ... \n"
+      "       ................................................\n"
+      "                                                       \n"
       ;
   fputs(string, fp);
 };
@@ -320,7 +322,7 @@ class AnnotationOutput{
 
     // only keep unique gene names
     inplace_make_set(&res);
-    
+
     topPriorityTemplate.add("TOP_GENE", res.size() ? res[0]: AnnotationString[INTERGENIC]);
     topPriorityTemplate.add("ALL_TOP_GENE", res);
     topPriorityTemplate.add("TOP_TYPE", this->priority->toString(highestPriority).c_str());
@@ -359,7 +361,7 @@ class AnnotationOutput{
   std::string getGeneAnnotation(const AnnotationResult& res){
     const std::vector<AnnotationType>& type = res.getType();
     const std::map<AnnotationType, std::string>& detail = res.getDetail();
-  
+
     std::vector<std::string> args;
     std::string s;
     for (int i = 0; i < type.size(); i++) {
@@ -420,7 +422,7 @@ class GeneAnnotation{
     } else if (s == "knowngene") {
       this->format.setUCSCKnownGeneFormat();
     } else if (s == "refgene") {
-      this->format.setRefGeneFormat();      
+      this->format.setRefGeneFormat();
     } else {
       fprintf(stderr, "Unknown format (other than refFlat, knownGene, refGene)!\nNow quitting...\n");
       abort();
@@ -677,7 +679,7 @@ class GeneAnnotation{
       int beg = 0;
       int sep = field[0].find(':', beg);
       std::string chr = field[0].substr(beg, sep - beg);
-      
+
       beg = sep + 1;
       sep = field[0].find('_', beg);
       int pos = toInt(field[0].substr(beg, sep - beg));
@@ -698,7 +700,7 @@ class GeneAnnotation{
       // real part of annotation
       annotate(chr, pos, ref, alt, &annotationResult);
       outputter.setAnnotationResult(annotationResult);
-                                
+
       // output annotation result
       fputs(field[0].substr(0, sep).c_str(), fout);
       fputc('_', fout);
@@ -707,7 +709,7 @@ class GeneAnnotation{
       // fputs(outputter.getFullAnnotation(annotationResult).c_str(), fout);
 
       for (unsigned int i = 1; i < field.size(); i++ ){
-        fputs("\t", fout);        
+        fputs("\t", fout);
         fputs(field[i].c_str(), fout) ;
       }
       fputc('\n', fout);
@@ -773,7 +775,14 @@ class GeneAnnotation{
       alt = altParam.substr(0, commaPos);
       type = determineVariationType(ref, alt);
     }
-
+    // verify reference
+    if (this->checkReference) {
+      std::string refFromGenome = this->gs.getBase(chrom, pos, pos + ref.size());
+      if (ref != refFromGenome) {
+        fprintf(stdout, "ERROR: Reference allele does not match genome reference [ %s:%d %s]\n", chrom.c_str(), pos, ref.c_str());
+        LOG << "ERRROR: Reference allele [" << ref <<   "]  does not match reference genome [" << refFromGenome << "] at " << chrom << ":" << pos << "\n";
+      };
+    }
     // find near target genes
     std::vector<unsigned> potentialGeneIdx;
     this->findInRangeGene(chrom, pos, &potentialGeneIdx);
@@ -781,7 +790,7 @@ class GeneAnnotation{
     this->annotationResult.clear();
     AnnotationResult annotationPerGene;
 
-    // determine variation type
+    // annotate for each gene
     for (unsigned int i = 0; i < potentialGeneIdx.size(); i++) {
       annotationPerGene.clear();
       this->annotateByGene(potentialGeneIdx[i], chrom, pos, ref, alt, type, &annotationPerGene);
@@ -887,6 +896,9 @@ class GeneAnnotation{
       fprintf(fp, "%d\t%d\n", key, freq);
     }
     fclose(fp);
+  };
+  void setCheckReference(bool b) {
+    this->checkReference = b;
   };
  private:
   // make sure genes are ordered
@@ -1386,6 +1398,7 @@ class GeneAnnotation{
   Codon codon;
   Priority priority;
   GeneFormat format;
+  bool checkReference;
   bool allowMixedVariation;       // VCF ALT field may have more than one variation e..g A,C
 
   std::vector<AnnotationResult> annotationResult;
@@ -1410,6 +1423,7 @@ int main(int argc, char *argv[])
       ADD_STRING_PARAMETER(pl, geneFile, "-g", "Specify gene file")
       ADD_PARAMETER_GROUP(pl, "Optional Parameters")
       ADD_STRING_PARAMETER(pl, inputFormat, "--inputFormat", "Specify format (default: vcf). \"-f plain \" will use first 4 columns as chrom, pos, ref, alt")
+      ADD_BOOL_PARAMETER(pl, checkReference, "--checkReference", "Check whether reference alleles matches genome reference")
       ADD_STRING_PARAMETER(pl, referenceFile, "-r", "Specify reference genome position")
       ADD_STRING_PARAMETER(pl, geneFileFormat, "-f", "Specify gene file format (default: refFlat, other options: knownGene, refGene)")
       ADD_STRING_PARAMETER(pl, priorityFile, "-p", "Specify priority of annotations")
@@ -1418,6 +1432,7 @@ int main(int argc, char *argv[])
       ADD_INT_PARAMETER(pl, downstreamRange, "-d", "Specify downstream range (default: 50)")
       ADD_INT_PARAMETER(pl, spliceIntoExon, "--se", "Specify splice into extron range (default: 3)")
       ADD_INT_PARAMETER(pl, spliceIntoIntron, "--si", "Specify splice into intron range (default: 8)")
+
       END_PARAMETER_LIST(pl)
       ;
 
@@ -1474,6 +1489,7 @@ int main(int argc, char *argv[])
   ga.openPriorityFile(FLAG_priorityFile.c_str());
 
   ga.setFormat(FLAG_geneFileFormat);
+  ga.setCheckReference(FLAG_checkReference);
   ga.openGeneFile(FLAG_geneFile.c_str());
   if (toLower(FLAG_inputFormat) == "vcf" || FLAG_inputFormat.size() == 0) {
     ga.annotateVCF(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());

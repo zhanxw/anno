@@ -174,6 +174,18 @@ public:
       return (it->second);
     }
   }
+  /**
+   * @return reference bases from chr:beg-end (beg inclusive, end exclusive)
+   */
+  std::string getBase(const std::string& c, int beg, int end) {
+    std::string ret;
+    if (beg > end) return ret;
+    ret.resize( end - beg);
+    for (int i = beg; i < end; ++i ) {
+      ret[i- beg] = (*this)[c][i];
+    };
+    return ret;
+  };
   bool exists(const std::string& c){
     if (this->data.find(c) != this->data.end())
       return true;
