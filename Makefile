@@ -13,6 +13,10 @@ debug: $(EXEC)
 $(EXEC): Main.cpp Gene.h Range.h IO.h Argument.h FreqTable.h GenomeSequence.h LogFile.h StringTemplate.h
 	g++ $(CXXFLAGS) -c Main.cpp
 	g++ $(CXXFLAGS) -o $@ Main.o -lz -lbz2 -lssl -lcrypto
+testBedReader: testBedReader.cpp BedReader.h
+	g++ $(CXXFLAGS) -c testBedReader.cpp
+	g++ $(CXXFLAGS) -o $@ testBedReader.o -lz -lbz2 -lssl -lcrypto
+
 clean:
 	rm -f *.o $(EXEC) input.*
 # basic test

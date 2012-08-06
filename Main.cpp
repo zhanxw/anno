@@ -224,7 +224,7 @@ class AnnotationResult{
     int highest = Priority::getLeastPriority();
     for (unsigned int i = 0; i != type.size(); i++) {
       int t = p.getPriority(type[i]);
-      if (t <= highest){
+      if (t < highest){
         highest = t;
         this->topPriorityIndex = i;
       }
@@ -905,7 +905,7 @@ class GeneAnnotation{
   void sortGene() {
     std::map<std::string, std::vector<Gene> >:: iterator it;
     for (it = this->geneList.begin(); it != this->geneList.end(); it ++){
-      std::sort( it->second.begin(), it->second.end(), GeneStartCompareLess);
+      std::sort( it->second.begin(), it->second.end(), GeneCompareLess);
     }
   };
   // store results in @param potentialGeneIdx

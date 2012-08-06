@@ -440,10 +440,10 @@ class Gene{
     bool isNonCodingGene;
     GeneFormat format;
 };
-bool GeneStartCompareLess(const Gene& a, const Gene& b) {
+bool GeneCompareLess(const Gene& a, const Gene& b) {
+  if (a.tx.start != b.tx.start)
     return a.tx.start < b.tx.start;
-};
-bool GeneEndCompareLess(const Gene& a, const Gene& b) {
-    return a.tx.end < b.tx.end;
+  else
+    return a.exon.size() < b.exon.size();
 };
 #endif /* _GENE_H_ */

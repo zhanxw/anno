@@ -1,6 +1,7 @@
 #ifndef _STRINGUTIL_H_
 #define _STRINGUTIL_H_
 
+#include <algorithm>
 /** tokenize the string
     @return number of tokens we obtained
     e.g. For empty input string, we will return 1, and result will have
