@@ -72,7 +72,33 @@ typedef enum {
   NONCODING
 } AnnotationType;
 
-const char* AnnotationString[]= {
+/**
+ * A class that provide strings corresponding to above annotation types.
+ */
+class OutputAnnotationString{
+ public:
+  OutputAnnotationString(){
+    this->setFormat("default");
+  }
+  void setFormat(const char* format) {
+    std::string f = format;
+    f = toLower(f);
+    if ( f == "default" ) {
+      this->annotationString = OutputAnnotationString::defaultAnnotationString;
+    } else if (f == "epact") {
+      this->annotationString = OutputAnnotationString::epactAnnotationString;
+    };
+  };
+  const char* operator [] (const int idx) {
+    return this->annotationString[idx];
+  };
+ private:
+  const char** annotationString;
+  static const char* defaultAnnotationString[];
+  static const char* epactAnnotationString[];
+}; // end class OutputAnnotationString
+
+const char* OutputAnnotationString::defaultAnnotationString[] = {
   "Insertion",
   "Deletion",
   "StructuralVariation",
@@ -99,6 +125,34 @@ const char* AnnotationString[]= {
   "Noncoding"
 };
 
+const char* OutputAnnotationString::epactAnnotationString[]= {
+  "Insertion",
+  "Deletion",
+  "StructuralVariation",
+  "Upstream",
+  "Downstream",
+  "Utr5",
+  "Utr3",
+  "Intron",
+  "Exon",
+  "SNV",
+  "Silent",                   // diff
+  "Missense",                 // diff
+  "Nonsense",                 // diff
+  "Stop_Loss",
+  "Start_Gain",
+  "Start_Loss",
+  "Normal_Splice_Site",
+  "Essential_Splice_Site",
+  "Frameshift",
+  "CodonGain",
+  "CodonLoss",
+  "CodonRegion",
+  "Intergenic",
+  "Noncoding"
+};
+
+OutputAnnotationString AnnotationString; // global variable
 
 // here we define format or the annotation.
 #define FORWARD_STRAND_STRING "+"
@@ -187,7 +241,7 @@ struct Priority{
 class AnnotationResult{
  public:
   void clear() {
-    this->geneName.clear();
+    this->gene = NULL;
     this->type.clear();
     this->detail.clear();
     this->topPriorityIndex = -1;
@@ -198,10 +252,7 @@ class AnnotationResult{
       // we usually record gene name and its strand first
       fprintf(stderr, "Something weired happen\n");
     }
-    this->geneName = g.geneName;
-    this->transcriptName = g.transcriptName;
-    this->isForwardStrand = g.forwardStrand;
-    //this->data.push_back(g.forwardStrand ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING);
+    this->gene = &g;
   };
   void add(const AnnotationType& t) {
     this->type.push_back(t);
@@ -255,13 +306,13 @@ class AnnotationResult{
   //////////////////////////////////////////////////////////////////////
   // getters
   const std::string& getGeneName() const{
-    return this->geneName;
+    return this->gene->geneName;
   };
   const std::string& getTranscriptName() const {
-    return this->transcriptName;
+    return this->gene->transcriptName;
   };
   const std::string getFullName() const {
-    return this->geneName + "/" + this->transcriptName;
+    return this->gene->geneName + "/" + this->gene->transcriptName;
   };
   const std::vector<AnnotationType>& getType() const{
     return this->type;
@@ -270,16 +321,14 @@ class AnnotationResult{
     return this->detail;
   };
   bool hasForwardStrand() const {
-    return this->isForwardStrand;
+    return this->gene->forwardStrand;
   };
 
  private:
-  std::string geneName;
-  std::string transcriptName;
-  bool isForwardStrand;
+  const Gene* gene;
   std::vector<AnnotationType> type;
   std::map<AnnotationType, std::string> detail;
-  int topPriorityIndex;  // this->type[this->topPriorityIndex] has top priority; <0, means unknown
+  int topPriorityIndex;  // this->type[this->topPriorityIndex] has top priority; <0, means unknown, will remove soon
 }; // end AnnotationResult
 
 /**
@@ -1392,7 +1441,9 @@ class GeneAnnotation{
   };
  private:
   GeneAnnotationParam param;
-  std::map <std::string, std::vector<Gene> > geneList;
+  std::map <std::string, std::vector<Gene> > geneList;   // chrom -> genes
+  std::map <std::string, std::vector<Gene*> > geneIndex; // gene name -> class Gene
+
   std::string annotation;
   GenomeSequence gs;
   Codon codon;
