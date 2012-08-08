@@ -356,6 +356,9 @@ class Gene{
         }
         return false;
     };
+    size_t getExonNumber() const {
+      return this->exon.size();
+    }
     int getTotalLength(const std::vector<Range>& v) {
         int l = 0;
         for (unsigned int i = 0; i < v.size() ; i++ )

@@ -172,6 +172,17 @@ OutputAnnotationString AnnotationString; // global variable
  */
 struct Priority{
  public:
+  // Level is just a wrapper for int, we use it only for type checking.
+  struct Level{
+    Level(int i):level(i){};
+    int level;
+    bool operator<(const Priority::Level& l) const{
+      return this->level < l.level;
+    };
+    bool operator==(const Priority::Level& l) const{
+      return this->level == l.level;
+    };
+  };    
   int open(const char* fileName) {
     // Load priority.txt
     this->priorityIdx = 0;
@@ -191,14 +202,16 @@ struct Priority{
     }
     return priorityIdx;
   };
-  int getPriority(const AnnotationType& t) const{
+  Level getPriority(const AnnotationType& t) const{
     std::map<std::string, int>::const_iterator it;
     it = this->priorityStr2Int.find( AnnotationString[t] );
     if (it == this->priorityStr2Int.end()) {
       fprintf(stderr, "Cannot find annotation type %s from priority files!", AnnotationString[t]);
-      return -1;
+      Level l(-1);      
+      return l;
     } else {
-      return it->second;
+      Level l(it->second);
+      return l;
     }
   };
 
@@ -244,7 +257,6 @@ class AnnotationResult{
     this->gene = NULL;
     this->type.clear();
     this->detail.clear();
-    this->topPriorityIndex = -1;
   };
 
   void add(const Gene& g){
@@ -261,50 +273,16 @@ class AnnotationResult{
   void addDetail(const AnnotationType& t, const std::string& s) {
     this->detail[t] = s;
   };
-
-  //////////////////////////////////////////////////////////////////////
-  // priority related functions
-  /**
-   * set @param topPriorityIndex to the index in this->type with top priority
-   */
-  int calculateTopPriority(const Priority& p) {
-    if (this->topPriorityIndex >= 0)
-      return this->topPriorityIndex;
-
-    this->topPriorityIndex = -1;
-    int highest = Priority::getLeastPriority();
-    for (unsigned int i = 0; i != type.size(); i++) {
-      int t = p.getPriority(type[i]);
-      if (t < highest){
-        highest = t;
-        this->topPriorityIndex = i;
-      }
-    }
-    return this->topPriorityIndex;
-  };
-
-  // /**
-  //  * @return top priority string.
-  //  * NOTE: should call calculateTopPriority first!
-  //  */
-  // std::string getTopPriorityString() const{
-  //   assert( this->topPriorityIndex >= 0);
-  //   std::string s = AnnotationString[this->topPriorityIndex]; // #p.toString(highest);
-  //   s += WITHIN_GENE_SEPARATOR;
-  //   s += this->geneName;
-  //   return s;
-  // };
-
-  AnnotationType getTopPriorityType() const{
-    if (this->type.size() == 0) {
-      return INTERGENIC;
-    }
-    assert( this->topPriorityIndex >= 0);
-    return this->type[this->topPriorityIndex];
+  void sortByPriority(const Priority& p) {
+    Comparator compareFunction(p);
+    std::sort(this->type.begin(), this->type.end(), compareFunction);
   };
 
   //////////////////////////////////////////////////////////////////////
   // getters
+  const Gene& getGene() const {
+    return (*this->gene);
+  };
   const std::string& getGeneName() const{
     return this->gene->geneName;
   };
@@ -313,6 +291,9 @@ class AnnotationResult{
   };
   const std::string getFullName() const {
     return this->gene->geneName + "/" + this->gene->transcriptName;
+  };
+  const size_t getExonNumber() const {
+    return this->gene->getExonNumber();
   };
   const std::vector<AnnotationType>& getType() const{
     return this->type;
@@ -323,13 +304,106 @@ class AnnotationResult{
   bool hasForwardStrand() const {
     return this->gene->forwardStrand;
   };
-
+  void dump() const { //debugging code
+    printf("[ %s ]", gene->geneName.c_str());
+    for (size_t i = 0; i < type.size(); ++i) {
+      printf(" %s ", AnnotationString[type[i]]);
+    };
+    puts("");
+  };
  private:
   const Gene* gene;
   std::vector<AnnotationType> type;
   std::map<AnnotationType, std::string> detail;
-  int topPriorityIndex;  // this->type[this->topPriorityIndex] has top priority; <0, means unknown, will remove soon
+
+  class Comparator{
+   public:
+    Comparator(const Priority& p): priority(p) {
+    };
+    bool operator() (const AnnotationType& t1,
+                     const AnnotationType& t2) {
+      this->priority.getPriority(t1) < this->priority.getPriority(t2);
+    };
+   private:
+    const Priority& priority;
+  };
+  
+  // int topPriorityIndex;  // this->type[this->topPriorityIndex] has top priority; <0, means unknown, will remove soon
 }; // end AnnotationResult
+
+class AnnotationResultCollection{
+ public:
+  AnnotationResultCollection(): sorted(false) {};
+  // STL like accessors
+  void push_back(const AnnotationResult& r) {
+    this->data.push_back(r);
+    this->sorted = false;
+  };
+  AnnotationResult& operator[] (int idx) {
+    return data[idx];
+  }
+  const AnnotationResult& operator[] (const int idx) const {
+    return data[idx];
+  }
+  bool empty() const {
+    return this->data.empty();
+  };
+  size_t size() const {
+    return this->data.size();
+  };
+  void clear() {
+    this->data.clear();
+    this->top.clear();
+  };
+  // sort all annoations and calculate top annotations
+  void sortByPriority(const Priority& p) {
+    for (size_t i = 0; i < data.size(); ++i) {
+      data[i].sortByPriority(p);
+    }
+    this->sorted = true;
+    
+    top.clear();
+    if (this->data.size() == 0) return;
+    
+    size_t highestIdx = 0;
+    Priority::Level highestPriority = p.getPriority(this->data[highestIdx].getType()[0]); // [0] is the highest priority
+    this->top.push_back(this->data[0]);    
+    for (size_t i = 1; i != this->data.size(); i++) {
+      Priority::Level newPriority = p.getPriority(this->data[i].getType()[0]);
+      if (newPriority < highestPriority) {
+        highestIdx = i;
+        highestPriority = newPriority;
+        this->top.clear();
+        this->top.push_back(this->data[i]);
+      } else if (newPriority == highestPriority) {
+          this->top.push_back(this->data[i]);
+      }
+    }
+    // sort by exon numbers
+    std::sort(this->top.begin(), this->top.end(), AnnotationResultCollection::CompareAnnotationResultByExonNumberGreater);
+    // for (size_t i = 0; i < this->top.size(); ++i) {
+    //   printf("%zu ", i);
+    //   this->top[i].dump();
+    // }
+    // puts("==========-");
+  };
+  /// remember to call sort by priority before
+  const std::vector<AnnotationResult>& getTopAnnotation() const{
+    assert(sorted);
+    return this->top;
+  };
+  const std::vector<AnnotationResult>& getAllAnnotation() const {
+    return this->data;
+  }
+ private:
+  static bool CompareAnnotationResultByExonNumberGreater(const AnnotationResult& r1,
+                                                         const AnnotationResult& r2) {
+    return r1.getExonNumber() > r2.getExonNumber();
+  };
+  std::vector<AnnotationResult> data;
+  std::vector<AnnotationResult> top; // top priority result
+  bool sorted;
+}; // end class AnnotationResultCollection
 
 /**
  * AnnotationOutput links the class AnnotationResult to a string representation
@@ -345,7 +419,7 @@ class AnnotationOutput{
       priority(NULL)
   {
   };
-  void setAnnotationResult(const std::vector<AnnotationResult>& r) {
+  void setAnnotationResult(const AnnotationResultCollection& r) {
     this->annotationResult = &r;
     this->buildKeywordDict();
   };
@@ -353,20 +427,17 @@ class AnnotationOutput{
     this->priority = &p;
   };
   void buildKeywordDict() {
-    const std::vector<AnnotationResult>& r = *this->annotationResult;
+    // const AnnotationResultCollection& r = *this->annotationResult;
+    if (this->annotationResult->size() == 0) { // intergenic
+      // will handle later in each separate functions.
+      return;
+    };
+    const std::vector<AnnotationResult>& top = this->annotationResult->getTopAnnotation();
+    const std::vector<AnnotationResult>& all = this->annotationResult->getAllAnnotation();
+    
     std::vector<std::string> res;
-    int highestPriority = Priority::getLeastPriority();
-    unsigned int highestIdx = 0;
-    for (unsigned int i = 0; i != r.size(); i++) {
-      int p = this->priority->getPriority(r[i].getTopPriorityType());
-      if (p < highestPriority) {
-        highestPriority = p;
-        highestIdx = i;
-        res.clear();
-        res.push_back(r[i].getGeneName());
-      } else if (p == highestPriority) {
-        res.push_back(r[i].getGeneName());
-      }
+    for (size_t i= 0; i < top.size() ; ++i) {
+      res.push_back(top[i].getGeneName());
     }
 
     // only keep unique gene names
@@ -374,18 +445,18 @@ class AnnotationOutput{
 
     topPriorityTemplate.add("TOP_GENE", res.size() ? res[0]: AnnotationString[INTERGENIC]);
     topPriorityTemplate.add("ALL_TOP_GENE", res);
-    topPriorityTemplate.add("TOP_TYPE", this->priority->toString(highestPriority).c_str());
+    topPriorityTemplate.add("TOP_TYPE", AnnotationString[top[0].getType()[0]]);
 
     std::vector<std::string> geneTemplate;
-    for (unsigned int i = 0; i != r.size(); i++){
-      geneTemplate.push_back(getGeneAnnotation(r[i]));
+    for (unsigned int i = 0; i != all.size(); i++){
+      geneTemplate.push_back(getGeneAnnotation(all[i]));
     }
     fullTemplate.add("GENE_ANNOTATION", geneTemplate);
   };
   // Format:
   //  Most_priority:gene1|gene2
-  std::string getTopPriorityAnnotation(const std::vector<AnnotationResult>& r, const Priority& p) const{
-    if (r.size() == 0) {
+  std::string getTopPriorityAnnotation() const{
+    if (this->annotationResult->empty()) {
       return AnnotationString[INTERGENIC];
     };
     std::string s;
@@ -395,8 +466,8 @@ class AnnotationOutput{
     return s;
   };
 
-  std::string getFullAnnotation(const std::vector<AnnotationResult>& r){
-    if (r.size() == 0) {
+  std::string getFullAnnotation(){
+    if (this->annotationResult->empty()) {
       return AnnotationString[INTERGENIC];
     };
     std::string s;
@@ -445,7 +516,7 @@ class AnnotationOutput{
   StringTemplate topPriorityTemplate;
   StringTemplate geneTemplate;
   StringTemplate fullTemplate;
-  const std::vector<AnnotationResult>* annotationResult;
+  const AnnotationResultCollection* annotationResult;
   const Priority* priority;
 }; // end AnnotationOutput
 
@@ -548,8 +619,8 @@ class GeneAnnotation{
       std::string alt = toUpper(field[4]);
 
       // real part of annotation
-      annotate(chr, pos, ref, alt, &annotationResult);
-      outputter.setAnnotationResult(annotationResult);
+      annotate(chr, pos, ref, alt, &annotationResults);
+      outputter.setAnnotationResult(annotationResults);
 
       // output annotation result
       // VCF info field is the 8th column
@@ -561,10 +632,10 @@ class GeneAnnotation{
             fputc(VCF_INFO_SEPARATOR, fout);
           }
           fputs(VCF_ANNOTATION_START_TAG, fout);
-          fputs(outputter.getTopPriorityAnnotation(annotationResult, this->priority).c_str(), fout);
+          fputs(outputter.getTopPriorityAnnotation().c_str(), fout);
           fputc(VCF_INFO_SEPARATOR, fout);
           fputs(VCF_ANNOTATION_START_TAG_FULL, fout);
-          fputs(outputter.getFullAnnotation(annotationResult).c_str(), fout);
+          fputs(outputter.getFullAnnotation().c_str(), fout);
         }
       }
       fputc('\n', fout);
@@ -603,8 +674,8 @@ class GeneAnnotation{
       std::string alt = toUpper(field[3]);
 
       // real part of annotation
-      annotate(chr, pos, ref, alt, &annotationResult);
-      outputter.setAnnotationResult(annotationResult);
+      annotate(chr, pos, ref, alt, &annotationResults);
+      outputter.setAnnotationResult(annotationResults);
 
       // output annotation result
       // VCF info field is the 8th column
@@ -612,9 +683,9 @@ class GeneAnnotation{
         fputs(field[i].c_str(), fout) ;
         fputs("\t", fout);
       }
-      fputs(outputter.getTopPriorityAnnotation(annotationResult, this->priority).c_str(), fout);
+      fputs(outputter.getTopPriorityAnnotation().c_str(), fout);
       fputs("\t", fout);
-      fputs(outputter.getFullAnnotation(annotationResult).c_str(), fout);
+      fputs(outputter.getFullAnnotation().c_str(), fout);
       fputc('\n', fout);
     }
     // close output
@@ -678,8 +749,8 @@ class GeneAnnotation{
       }
 
       // real part of annotation
-      annotate(chr, pos, ref, alt, &annotationResult);
-      outputter.setAnnotationResult(annotationResult);
+      annotate(chr, pos, ref, alt, &annotationResults);
+      outputter.setAnnotationResult(annotationResults);
 
       // output annotation result
       // VCF info field is the 8th column
@@ -687,9 +758,9 @@ class GeneAnnotation{
         fputs(field[i].c_str(), fout) ;
         fputs("\t", fout);
       }
-      fputs(outputter.getTopPriorityAnnotation(annotationResult, this->priority).c_str(), fout);
+      fputs(outputter.getTopPriorityAnnotation().c_str(), fout);
       fputs("\t", fout);
-      fputs(outputter.getFullAnnotation(annotationResult).c_str(), fout);
+      fputs(outputter.getFullAnnotation().c_str(), fout);
       fputc('\n', fout);
     }
     // close output
@@ -747,13 +818,13 @@ class GeneAnnotation{
         continue;
       }
       // real part of annotation
-      annotate(chr, pos, ref, alt, &annotationResult);
-      outputter.setAnnotationResult(annotationResult);
+      annotate(chr, pos, ref, alt, &annotationResults);
+      outputter.setAnnotationResult(annotationResults);
 
       // output annotation result
       fputs(field[0].substr(0, sep).c_str(), fout);
       fputc('_', fout);
-      fputs(outputter.getTopPriorityAnnotation(annotationResult, this->priority).c_str(), fout);
+      fputs(outputter.getTopPriorityAnnotation().c_str(), fout);
       // fputs("\t", fout);
       // fputs(outputter.getFullAnnotation(annotationResult).c_str(), fout);
 
@@ -814,7 +885,7 @@ class GeneAnnotation{
                 const int pos,
                 const std::string& ref,
                 const std::string& altParam,
-                std::vector<AnnotationResult>* annotationResult) {
+                AnnotationResultCollection* annotationResult) {
     // check VARATION_TYPE
     std::string alt = altParam;
     VARIATION_TYPE type = determineVariationType(ref, alt);
@@ -836,40 +907,24 @@ class GeneAnnotation{
     std::vector<unsigned> potentialGeneIdx;
     this->findInRangeGene(chrom, pos, &potentialGeneIdx);
     // if Intergenic,  we will have (potentialGeneIdx.size() == 0)
-    this->annotationResult.clear();
-    AnnotationResult annotationPerGene;
 
+    this->annotationResults.clear();
+    AnnotationResult annotationPerGene;
     // annotate for each gene
     for (unsigned int i = 0; i < potentialGeneIdx.size(); i++) {
       annotationPerGene.clear();
       this->annotateByGene(potentialGeneIdx[i], chrom, pos, ref, alt, type, &annotationPerGene);
-      this->annotationResult.push_back(annotationPerGene);
+      // annotationPerGene.dump();
+      this->annotationResults.push_back(annotationPerGene);
     }
-
+    annotationResults.sortByPriority(this->priority);
+    
     // record frquency info
-    if (!this->annotationResult.size()) { // intergenic
-      this->annotationTypeFreq.add(INTERGENIC);
-      this->topPriorityAnnotationTypeFreq.add(INTERGENIC);
-    } else {
-      int topPriorityIndex = -1;
-      int topPriority = Priority::getLeastPriority();
-      for (unsigned int i = 0; i != this->annotationResult.size(); i++) {
-        // calculate high priority for each gene
-        this->annotationResult[i].calculateTopPriority(this->priority);
-
-        //
-        const AnnotationType& t = this->annotationResult[i].getTopPriorityType();
-        int p = this->priority.getPriority(t);
-        if ( p < topPriority) {
-          topPriorityIndex = i;
-          topPriority = p;
-        }
-        for (unsigned int j = 0; j < this->annotationResult[i].getType().size(); j++ ){
-          this->annotationTypeFreq.add( this->annotationResult[i].getType() [j] );
-        }
-      }
-      this->topPriorityAnnotationTypeFreq.add(this->annotationResult[topPriorityIndex].getTopPriorityType());
-    }
+    updateTypeFrequency(type, ref, alt);
+    updateAnnotationFrequency(annotationResults);
+    return;
+  };
+  void updateTypeFrequency(const VARIATION_TYPE& type, const std::string& ref, const std::string& alt) {
     switch (type) {
       case SNP:
         this->baseFreq.add(ref + "->" +alt);
@@ -880,7 +935,23 @@ class GeneAnnotation{
       default:
         break;
     }
-    return;
+  }
+  void updateAnnotationFrequency(const AnnotationResultCollection& result) {
+    if (!result.size()) { // intergenic
+      this->annotationTypeFreq.add(INTERGENIC);
+      this->topPriorityAnnotationTypeFreq.add(INTERGENIC);
+    } else {
+      const std::vector<AnnotationResult>& top = result.getTopAnnotation();
+      this->topPriorityAnnotationTypeFreq.add(top[0].getType()[0]);
+      
+      const std::vector<AnnotationResult>& all = result.getAllAnnotation();
+      for (size_t i = 0; i < all.size(); ++i ){
+        size_t n = all[i].getType().size();
+        for (size_t j = 0; j < n; j++ ){
+          this->annotationTypeFreq.add( all[i].getType() [j] );
+        }
+      }
+    }
   };
   void setAnnotationParameter(GeneAnnotationParam& param) {
     this->param = param;
@@ -1391,7 +1462,7 @@ class GeneAnnotation{
         LOG << "Currently we don't support this variation type: " << type << "\n";
         break;
     };
-
+    
     return;
   };
   /**
@@ -1440,11 +1511,12 @@ class GeneAnnotation{
     return UNKNOWN;
   };
  private:
-  GeneAnnotationParam param;
+  // internal data
   std::map <std::string, std::vector<Gene> > geneList;   // chrom -> genes
-  std::map <std::string, std::vector<Gene*> > geneIndex; // gene name -> class Gene
-
   std::string annotation;
+
+  // parameters 
+  GeneAnnotationParam param;
   GenomeSequence gs;
   Codon codon;
   Priority priority;
@@ -1452,15 +1524,16 @@ class GeneAnnotation{
   bool checkReference;
   bool allowMixedVariation;       // VCF ALT field may have more than one variation e..g A,C
 
-  std::vector<AnnotationResult> annotationResult;
+  // output related variables
+  AnnotationResultCollection annotationResults;
   AnnotationOutput outputter;               // control output format
 
+  // frequency related variables
   FreqTable<AnnotationType> annotationTypeFreq;                 // base change frequency
   FreqTable<AnnotationType> topPriorityAnnotationTypeFreq;      // base change frequency of top priority
   FreqTable<std::string> baseFreq;                              // base change frequency
   FreqTable<std::string> codonFreq;                             // codon change frequency
   FreqTable<int> indelLengthFreq;                               // for insertion, the value is positive; for deletion, positive
-
 }; // end class GeneAnnotation
 
 int main(int argc, char *argv[])
@@ -1507,6 +1580,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Please specify gene file\n");
     exit(1);
   }
+
   GeneAnnotationParam param;
   param.upstreamRange = FLAG_upstreamRange ? FLAG_upstreamRange : 50;
   param.downstreamRange = FLAG_downstreamRange ? FLAG_downstreamRange : 50;
