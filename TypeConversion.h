@@ -47,6 +47,13 @@ int toInt(const std::string& input) {
     return (atoi(input.c_str()));
 };
 
+float toFloat(const char* input) {
+    return (atof(input));
+};
+float toFloat(const std::string& input) {
+    return (atof(input.c_str()));
+};
+
 // convert std::string to double
 // @return true if conversion succeed
 bool str2double(const char* input, double* output) {

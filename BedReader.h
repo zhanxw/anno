@@ -38,7 +38,7 @@ bool inRegion(const int pos, const Region& r) {
 
 class BedReader {
  public:
-  int load(const char* fn){
+  int open(const char* fn){
     LineReader lr(fn);
     std::vector<std::string> fd;
 
@@ -74,7 +74,8 @@ class BedReader {
   int find(const char* chrom, int pos,
            std::vector<std::string>* ret_label) const {
     int nFound = 0;
-
+    ret_label->clear();
+    
     ConstIndexIter iterChrom = this->index.find(chrom);
     if (iterChrom == this->index.end()) {
       return 0;
@@ -82,9 +83,13 @@ class BedReader {
     RegionIndex temp;
     temp.beg = temp.end = pos;
     ConstRegionIndexIter iter = std::lower_bound(iterChrom->second.begin(), iterChrom->second.end(), temp, RegionIndexComparator);
+    
     // iter always points to the region on the right of the region
     // e.g. find 100, but points to (200, 300) region
     // so we need to rewind to the left (subtract 1)
+    if (iter == iterChrom->second.begin())
+      return 0;
+
     iter--;
     // int idx;
     // if (iter == iterChrom->second.end()) {
@@ -98,7 +103,7 @@ class BedReader {
     for (size_t i = 0; i < index.size(); ++i ) {
       const Region& r = (iterRegion->second)[index[i]];
       if (inRegion(pos, r)) {
-        printf("i = %zu, pos = %d, beg = %d, end = %d\n", i, pos, r.beg, r.end);
+        // printf("i = %zu, pos = %d, beg = %d, end = %d\n", i, pos, r.beg, r.end);
         ret_label->push_back ( r.label);
       }
     }
@@ -118,7 +123,7 @@ class BedReader {
       for (ConstRegionIter iter2 = iter->second.begin();
            iter2 != iter->second.end();
            ++iter2) {
-        fprintf(stderr, " [ %d ] %s:%d-%d -> %s \n", idx++, iter->first.c_str(), iter2->beg, iter2->end, iter2->label.c_str());   
+        // fprintf(stderr, " [ %d ] %s:%d-%d -> %s \n", idx++, iter->first.c_str(), iter2->beg, iter2->end, iter2->label.c_str());   
       };
     };
   };
@@ -158,11 +163,11 @@ class BedReader {
       ri.end = r.end;
       ri.overlap.push_back(0);
       for (size_t i = 1; i < n; ++i) {
-        printf("%zu\t", i);
+        // printf("%zu\t", i);
         if (inRegion(region[i].beg, r)) {// merge region
           r.end = std::max(r.end, region[i].end);
           ri.overlap.push_back(i);
-          printf("pushed in %zu\t", i);          
+          // printf("pushed in %zu\t", i);          
         } else { // 
           this->index[iter->first].push_back(ri);          
           r = region[i];
@@ -170,16 +175,16 @@ class BedReader {
           ri.end = r.end;
           ri.overlap.clear();
           ri.overlap.push_back(i);
-          printf("skip %zu\t", i);          
+          // printf("skip %zu\t", i);          
         };
-        printf("\n");
+        // printf("\n");
       }
       if (ri.overlap.size()){
         this->index[iter->first].push_back(ri);
       }
     };
-    dumpData();
-    dumpIndex();
+    /* dumpData(); */
+    /* dumpIndex(); */
   };
   static const char SEPARATOR = ',';
   std::map<std::string, std::vector< Region > > data;

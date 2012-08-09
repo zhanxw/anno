@@ -9,6 +9,8 @@ release: $(EXEC)
 	cp -f $(EXEC) executable
 debug: CXXFLAGS = -ggdb -O0 $(DEFAULT_CXXFLAGS)
 debug: $(EXEC)
+profile: CXXFLAGS = -ggdb -pg -O0 $(DEFAULT_CXXFLAGS)
+profile: $(EXEC)
 
 $(EXEC): Main.cpp Gene.h Range.h IO.h Argument.h FreqTable.h GenomeSequence.h LogFile.h StringTemplate.h
 	g++ $(CXXFLAGS) -c Main.cpp
@@ -16,7 +18,9 @@ $(EXEC): Main.cpp Gene.h Range.h IO.h Argument.h FreqTable.h GenomeSequence.h Lo
 testBedReader: testBedReader.cpp BedReader.h
 	g++ $(CXXFLAGS) -c testBedReader.cpp
 	g++ $(CXXFLAGS) -o $@ testBedReader.o -lz -lbz2 -lssl -lcrypto
-
+testGenomeScore: testGenomeScore.cpp GenomeScore.h
+	g++ $(CXXFLAGS) -c testGenomeScore.cpp -O2
+	g++ $(CXXFLAGS) -o $@ testGenomeScore.o -lz -lbz2 -lssl -lcrypto -O2
 clean:
 	rm -f *.o $(EXEC) input.*
 # basic test

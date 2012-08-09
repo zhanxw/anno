@@ -12,7 +12,8 @@ int main(int argc, char *argv[])
 {
 
   BedReader br;
-  br.load("test.bed");
+  int r = br.open("test.bed");
+  printf("load %d regions\n", r);
   // br.dump();
   std::vector<std::string> ret;
   if (br.find("1", 100, &ret)) {
