@@ -1,8 +1,8 @@
-Stp->Tyr	1
-Pro->His	1
 Arg->Arg	1
-Pro->Pro	1
 Arg->Met	1
 Leu->Val	1
-Pro->Thr	2
+Pro->His	1
+Pro->Pro	1
+Stp->Tyr	1
 Gly->Gly	2
+Pro->Thr	2

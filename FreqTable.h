@@ -20,7 +20,7 @@ public:
         this->data[t] -- ;
         this->isSorted = false;
     };
-    unsigned int size() const{ return this->data.size();}; 
+    size_t size() const{ return this->data.size();}; 
     // return the frequency in ascending order
     void at(const unsigned int idx, T* t, int* v) {
         if (!this->isSorted) 
@@ -33,11 +33,20 @@ public:
         this->orderedData.clear();
         this->isSorted = false;
     };
+    void dump() {
+      for (size_t i = 0; i < this->orderedData.size(); ++i) {
+        std::cout << i << "\t"
+                  << orderedData[i].first << "\t"
+                  << *(orderedData[i].second) << "\n";
+      }
+    };
+      
 private:
     void sortByFrequency() {
         this->sortByKey();
-        std::sort(this->orderedData.begin(), this->orderedData.end());
+        std::stable_sort(this->orderedData.begin(), this->orderedData.end(), FreqTable::sortFirstInPair);
         this->isSorted = true;
+        /* dump();  */
     };
     void sortByKey() {
         this->orderedData.clear();
@@ -46,7 +55,18 @@ private:
              it != this->data.end() ; it++) {
             this->orderedData.push_back(std::make_pair( (*it).second, &((*it).first)) );
         }
+        /* dump(); */
+        /* std::stable_sort(this->orderedData.begin(), this->orderedData.end(), FreqTable::sortSecondInPair); */
+        /* dump(); */
         this->isSorted = true;
+    };
+    static bool sortFirstInPair( const std::pair<int, const T*>& t1,
+                                 const std::pair<int, const T*>& t2) {
+      return t1.first < t2.first;
+    };
+    static bool sortSecondInPair( const std::pair<int, const T*>& t1,
+                                 const std::pair<int, const T*>& t2) {
+      return *(t1.second) < *(t2.second);
     };
     std::map< T, int > data;
     std::vector< std::pair<int, const T*> > orderedData;

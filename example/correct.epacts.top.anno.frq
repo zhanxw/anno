@@ -3,11 +3,11 @@ Downstream	13
 Start_Loss	15
 Exon	17
 Upstream	42
-Stop_Gain	91
-Essential_Splice_Site	156
+Nonsense	87
+Essential_Splice_Site	159
 Utr5	281
 Utr3	491
-Normal_Splice_Site	614
-Synonymous	4886
+Normal_Splice_Site	936
+Silent	4745
+Missense	6100
 Intron	6209
-Nonsynonymous	6280

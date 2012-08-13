@@ -48,7 +48,7 @@ test5: debug
 
 # test epacts annotation
 test6: debug
-	(cd example; ../$(EXEC) -i input.epacts --inputFormat epacts -r ../resources/human.g1k.v37.fa -f refGene -g ../resources/refGene.txt.gz -c ../codon.txt -o output.epacts)
+	(cd example; ../$(EXEC) -i input.epacts --inputFormat epacts -r ../resources/human.g1k.v37.fa -f refGene -g ../resources/refGene.txt.gz -c ../codon.txt -o output.epacts --outputFormat epact -p ../priority.epact.txt)
 	(cd example; diff {correct,output}.epacts)
 
 test: test1 test2 test3 test4 test5 test6

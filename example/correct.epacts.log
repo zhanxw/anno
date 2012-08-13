@@ -1,9 +1,9 @@
-Analysis program [ ../anno ] started on Wed May 30 10:20:31 2012
-# ParameterList created by zhanxw on dumbo at Wed May 30 10:20:31 2012
--i "input.epacts" -o "correct.epacts" -g "../resources/refGene.txt.gz" --inputFormat "epacts" -r "../resources/human.g1k.v37.fa" -f "refGene" -c "../codon.txt"
+Analysis program [ ../anno ] started on Mon Aug 13 13:38:44 2012
+# ParameterList created by zhanxw on dumbo at Mon Aug 13 13:38:44 2012
+-i "input.epacts" -o "correct.epacts" -g "../resources/refGene.txt.gz" --inputFormat "epacts" -r "../resources/human.g1k.v37.fa" -f "refGene" -p "../priority.epact.txt" -c "../codon.txt" --outputFormat "epact"
 Reference genome file ../resources/human.g1k.v37.fa loads succeed!
 Codon file ../codon.txt loads succeed!
-Priority file /net/fantasia/home/zhanxw/anno/priority.txt load succeed!
+Priority file ../priority.epact.txt load succeed!
 Gene file ../resources/refGene.txt.gz loads succeed!
 Annotate input.epacts to correct.epacts succeed!
 Generate frequency of each annotation type in correct.epacts.anno.frq succeed!
@@ -11,4 +11,4 @@ Generate frequency of high priority for highest priority annotation type in corr
 Generate frequency of each base change in correct.epacts.base.frq succeed!
 Generate frequency of each codon change in correct.epacts.codon.frq succeed!
 Generate frequency of indel length in correct.epacts.indel.frq succeed!
-Analysis succeeded in 4 second(s) and finished at Wed May 30 10:20:35 2012
+Analysis succeeded in 3 second(s) and finished at Mon Aug 13 13:38:47 2012

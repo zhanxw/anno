@@ -1,7 +1,4 @@
 /**
- * TODO:
- * 1. Customized to suppor multiple BED files using different tags
- * 2. Support SIFT, PhyloP...
  * 3. Output in VAT format
  */
 #include <stdio.h>
@@ -37,7 +34,7 @@ void banner(FILE* fp) {
       "   ...      Speical Thanks:                    ...     \n"
       "    ...      Hyun Ming Kang, Yanming Li         ...    \n"
       "     ...      zhanxw@umich.edu                    ...  \n"
-      "      ...      Jun 2011                            ... \n"
+      "      ...      Aug 2011                            ... \n"
       "       ................................................\n"
       "                                                       \n"
       ;
@@ -54,30 +51,30 @@ typedef enum {
 } VARIATION_TYPE;
 
 typedef enum {
-  INSERTION = 0,
-  DELETION,
-  STRUCTURE_VARIATION,
-  UPSTREAM,
-  DOWNSTREAM,
-  UTR5,
-  UTR3,
-  INTRON,
-  EXON,
-  SNV,                    /*SNV contains the following 6 types, it appears when there is no reference.*/
-  SYNONYMOUS,
-  NONSYNONYMOUS,
+  STRUCTURE_VARIATION = 0,
   STOP_GAIN,
   STOP_LOSS,
   START_GAIN,
   START_LOSS,
-  NORMAL_SPLICE_SITE,
-  ESSENTIAL_SPLICE_SITE,
   FRAME_SHIFT,            /* Indel length is not divisible by 3 */
   CODON_GAIN,             /* Insertion length is divisible by 3 */
   CODON_LOSS,             /* Deletion length is divisible by 3 */
   CODON_REGION,           /* Just say the variant is in the Coding Region, used in Structrual Varition*/
-  INTERGENIC,
-  NONCODING
+  INSERTION,
+  DELETION,
+  NONSYNONYMOUS,
+  SYNONYMOUS,
+  ESSENTIAL_SPLICE_SITE,
+  NORMAL_SPLICE_SITE,
+  UTR5,
+  UTR3,
+  EXON,
+  INTRON,
+  UPSTREAM,
+  DOWNSTREAM,
+  SNV,                    /*SNV contains the following 6 types, it appears when there is no reference.*/
+  NONCODING,
+  INTERGENIC
 } AnnotationType;
 
 /**
@@ -109,57 +106,57 @@ class OutputAnnotationString{
 }; // end class OutputAnnotationString
 
 const char* OutputAnnotationString::defaultAnnotationString[] = {
-  "Insertion",
-  "Deletion",
   "StructuralVariation",
-  "Upstream",
-  "Downstream",
-  "Utr5",
-  "Utr3",
-  "Intron",
-  "Exon",
-  "SNV",
-  "Synonymous",
-  "Nonsynonymous",
   "Stop_Gain",
   "Stop_Loss",
   "Start_Gain",
   "Start_Loss",
-  "Normal_Splice_Site",
-  "Essential_Splice_Site",
   "Frameshift",
   "CodonGain",
   "CodonLoss",
   "CodonRegion",
-  "Intergenic",
-  "Noncoding"
+  "Insertion",
+  "Deletion",
+  "Nonsynonymous",
+  "Synonymous",
+  "Essential_Splice_Site",
+  "Normal_Splice_Site",
+  "Utr5",
+  "Utr3",
+  "Exon",
+  "Intron",
+  "Upstream",
+  "Downstream",
+  "SNV",
+  "Noncoding",
+  "Intergenic"
 };
 
 const char* OutputAnnotationString::epactAnnotationString[]= {
-  "Insertion",
-  "Deletion",
   "StructuralVariation",
-  "Upstream",
-  "Downstream",
-  "Utr5",
-  "Utr3",
-  "Intron",
-  "Exon",
-  "SNV",
-  "Silent",                   // diff
-  "Missense",                 // diff
   "Nonsense",                 // diff
   "Stop_Loss",
   "Start_Gain",
   "Start_Loss",
-  "Normal_Splice_Site",
-  "Essential_Splice_Site",
   "Frameshift",
   "CodonGain",
   "CodonLoss",
   "CodonRegion",
-  "Intergenic",
-  "Noncoding"
+  "Insertion",
+  "Deletion",
+  "Missense",                 // diff
+  "Silent",                   // diff
+  "Essential_Splice_Site",
+  "Normal_Splice_Site",
+  "Utr5",
+  "Utr3",
+  "Exon",
+  "Intron",
+  "Upstream",
+  "Downstream",
+  "SNV",
+  "Noncoding",
+  "Intergenic"
 };
 
 OutputAnnotationString AnnotationString; // global variable
@@ -216,7 +213,7 @@ struct Priority{
     std::map<std::string, int>::const_iterator it;
     it = this->priorityStr2Int.find( AnnotationString[t] );
     if (it == this->priorityStr2Int.end()) {
-      fprintf(stderr, "Cannot find annotation type %s from priority files!", AnnotationString[t]);
+      fprintf(stderr, "Cannot find annotation type [ %s ] from priority files!\n", AnnotationString[t]);
       Level l(-1);      
       return l;
     } else {
@@ -229,7 +226,7 @@ struct Priority{
     std::map<int, std::string>::const_iterator it;
     it = this->priorityInt2Str.find( i );
     if (it == this->priorityInt2Str.end()) {
-      fprintf(stderr, "Cannot find priority %d from priority files!", i);
+      fprintf(stderr, "Cannot find priority [ %d ] from priority files!\n", i);
       return "";
     } else {
       return it->second;
@@ -1634,6 +1631,8 @@ int main(int argc, char *argv[])
       ADD_INT_PARAMETER(pl, downstreamRange, "-d", "Specify downstream range (default: 50)")
       ADD_INT_PARAMETER(pl, spliceIntoExon, "--se", "Specify splice into extron range (default: 3)")
       ADD_INT_PARAMETER(pl, spliceIntoIntron, "--si", "Specify splice into intron range (default: 8)")
+      ADD_STRING_PARAMETER(pl, outputFormat, "--outputFormat", "Specify predefined annotation words (default or epact)")
+      ADD_PARAMETER_GROUP(pl, "Additional Functions")      
       ADD_STRING_PARAMETER(pl, genomeScore, "--genomeScore", "Specify the folder of genome score (e.g. GERP=dirGerp/,SIFT=dirSift/)")
       ADD_STRING_PARAMETER(pl, bedFile, "--bed", "Specify the bed file and tag (e.g. ONTARGET1=a1.bed,ONTARGET2=a2.bed)")
       END_PARAMETER_LIST(pl)
@@ -1687,6 +1686,12 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Use default codon file: /net/fantasia/home/zhanxw/anno/codon.txt\n");
     FLAG_referenceFile = "/data/local/ref/karma.ref/human.g1k.v37.fa";
   }
+  if (!FLAG_outputFormat.empty()) {
+    AnnotationString.setFormat(FLAG_outputFormat.c_str());
+  }
+  else {
+    AnnotationString.setFormat(FLAG_outputFormat.c_str());    
+  };
   if (!FLAG_bedFile.empty()) {
     fprintf(stderr, "Use bed file: %s\n", FLAG_bedFile.c_str() );
     std::vector< std::string> fd;
