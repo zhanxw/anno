@@ -546,10 +546,16 @@ struct GeneAnnotationParam{
 
 class GeneAnnotation{
  public:
-  GeneAnnotation():allowMixedVariation(false),
-                   bedReader(NULL),
-                   genomeScore(NULL)
+  GeneAnnotation():allowMixedVariation(false)
   {};
+  virtual ~GeneAnnotation() {
+    for (size_t i = 0; i < bedReader.size() ; ++i) {
+      delete bedReader[i];
+    }
+    for (size_t i = 0; i < genomeScore.size(); ++i ) {
+      delete genomeScore[i];
+    };
+  };
   void setFormat(const std::string& f) {
     std::string s = toLower(f);
     if (s == "refflat") {
@@ -607,19 +613,41 @@ class GeneAnnotation{
     return;
   };
   void addBedFile(const char* tag, const char* fn) {
-    this->bedTag = tag;
-    this->bedReader = new BedReader;
-    int ret = this->bedReader->open(fn);
+    // check duplication
+    for (size_t i = 0; i < this->bedTag.size(); ++i ) {
+      if (this->bedTag[i] == tag) {
+        fprintf(stderr, "ERROR: Duplicated tag [ %s ] \n", tag);
+        return;
+      }
+    }
+          
+    // add bedFile
+    BedReader* p = new BedReader;
+    int ret = p->open(fn);
     if (ret < 0) {
       fprintf(stderr, "Cannot open BED file: [ %s ]\n", fn);
-      delete bedReader;
+      delete p;
+      return ;
     } else {
       fprintf(stderr, "DONE: Load %d regions from BED file\n", ret);
     };
+
+    this->bedTag.push_back(tag);
+    this->bedReader.push_back(p);
   };
   void addGenomeScore(const char* tag, const char* fn){
-    this->genomeScoreTag = tag;
-    this->genomeScore = new GenomeScore(fn);
+    // check duplication
+    for (size_t i = 0; i < this->genomeScoreTag.size(); ++i) {
+      if (this->genomeScoreTag[i] == tag ) {
+        fprintf(stderr, "ERROR: Duplicated tag [ %s ] \n", tag);
+        return;
+      }
+    }
+          
+    // add genome score file
+    GenomeScore* p = new GenomeScore(fn);
+    this->genomeScoreTag.push_back(tag);
+    this->genomeScore.push_back(p);
   };
   /**
    * parse input file, and call annotate, and then output results
@@ -667,15 +695,19 @@ class GeneAnnotation{
           fputc(VCF_INFO_SEPARATOR, fout);
           fputs(VCF_ANNOTATION_START_TAG_FULL, fout);
           fputs(outputter.getFullAnnotation().c_str(), fout);
-          if (this->bedReader) {
-            if (this->bedReader->find(chr.c_str(), pos, &bedString)){
-              fputs(";BED=", fout);
+          for (size_t br = 0; br < this->bedReader.size(); ++ br) {
+            if (this->bedReader[br]->find(chr.c_str(), pos, &bedString)){
+              fputs(";", fout);
+              fputs(this->bedTag[br].c_str(), fout);
+              fputs("=", fout);
               fputs(stringJoin(bedString, ',').c_str(), fout);
             }
           }
-          if (this->genomeScore) {
-            fputs(";GERP=", fout);
-            fprintf(fout, "%.3f", this->genomeScore->baseScore(chr.c_str(), pos));
+          for (size_t gs = 0; gs < this->genomeScore.size(); ++ gs) {
+            fputs(";", fout);
+            fputs(this->genomeScoreTag[gs].c_str(), fout);
+            fputs("=", fout);
+            fprintf(fout, "%.3f", this->genomeScore[gs]->baseScore(chr.c_str(), pos));
           }
         }
       }
@@ -1555,10 +1587,11 @@ class GeneAnnotation{
   // internal data
   std::map <std::string, std::vector<Gene> > geneList;   // chrom -> genes
   std::string annotation;
-  BedReader* bedReader;
-  std::string bedTag;
-  GenomeScore* genomeScore;
-  std::string genomeScoreTag;
+
+  std::vector<BedReader*> bedReader;
+  std::vector<std::string> bedTag;
+  std::vector<GenomeScore*> genomeScore;
+  std::vector<std::string> genomeScoreTag;
   
   // parameters 
   GeneAnnotationParam param;
@@ -1601,8 +1634,8 @@ int main(int argc, char *argv[])
       ADD_INT_PARAMETER(pl, downstreamRange, "-d", "Specify downstream range (default: 50)")
       ADD_INT_PARAMETER(pl, spliceIntoExon, "--se", "Specify splice into extron range (default: 3)")
       ADD_INT_PARAMETER(pl, spliceIntoIntron, "--si", "Specify splice into intron range (default: 8)")
-      ADD_STRING_PARAMETER(pl, genomeScore, "--genomeScore", "Specify the folder of genome score (e.g. GERP=dirGerp/)")
-      ADD_STRING_PARAMETER(pl, bedFile, "--bed", "Specify the bed file and tag (e.g. ONTARGET=a.bed)")
+      ADD_STRING_PARAMETER(pl, genomeScore, "--genomeScore", "Specify the folder of genome score (e.g. GERP=dirGerp/,SIFT=dirSift/)")
+      ADD_STRING_PARAMETER(pl, bedFile, "--bed", "Specify the bed file and tag (e.g. ONTARGET1=a1.bed,ONTARGET2=a2.bed)")
       END_PARAMETER_LIST(pl)
       ;
 
@@ -1656,12 +1689,37 @@ int main(int argc, char *argv[])
   }
   if (!FLAG_bedFile.empty()) {
     fprintf(stderr, "Use bed file: %s\n", FLAG_bedFile.c_str() );
-    ga.addBedFile("BED", FLAG_bedFile.c_str());
+    std::vector< std::string> fd;
+    std::vector< std::string> bed;
+    stringTokenize(FLAG_bedFile, ",", &fd);
+    for (size_t i = 0; i < fd.size(); ++i ){
+      stringTokenize(fd[i], "=", &bed);
+      if (bed.size() == 2) {
+        ga.addBedFile(bed[0].c_str(), bed[1].c_str());
+      } else {
+        fprintf(stderr, "ERROR: Cannot recognized format [ %s ].\n", fd[i].c_str());
+        exit(1);
+      };
+    };
   };
   if (!FLAG_genomeScore.empty()){
-    fprintf(stderr, "Use binary GERP score: %s\n", FLAG_genomeScore.c_str());
-    ga.addGenomeScore("GERP", FLAG_genomeScore.c_str());
+    // fprintf(stderr, "Use binary GERP score: %s\n", FLAG_genomeScore.c_str());
+    // ga.addGenomeScore("GERP", FLAG_genomeScore.c_str());
+    fprintf(stderr, "Use binary score file: %s\n", FLAG_genomeScore.c_str() );
+    std::vector< std::string> fd;
+    std::vector< std::string> gs;
+    stringTokenize(FLAG_genomeScore, ",", &fd);
+    for (size_t i = 0; i < fd.size(); ++i ){
+      stringTokenize(fd[i], "=", &gs);
+      if (gs.size() == 2) {
+        ga.addGenomeScore(gs[0].c_str(), gs[1].c_str());
+      } else {
+        fprintf(stderr, "ERROR: Cannot recognized format [ %s ].\n", fd[i].c_str());
+        exit(1);
+      };
+    };
   };
+  
   ga.openReferenceGenome(FLAG_referenceFile.c_str());
   ga.openCodonFile(FLAG_codonFile.c_str());
   ga.openPriorityFile(FLAG_priorityFile.c_str());

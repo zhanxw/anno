@@ -1,15 +1,5 @@
-TODO
-----
-* finish in isExon() ... functions
-* add indel support
-* make input/outpt flexible
+Reference
+=========
 
-DONE
-----
-* convert mediawiki to markdown (1. http://w-i-k-i.appspot.com/ ; 2. pandoc)
-
-Background
-----------
-
-Exon contains CDS
+http://www.sph.umich.edu/csg/liyanmin/vcfCodingSnps/Tutorial.shtml
 
