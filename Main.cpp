@@ -39,6 +39,18 @@ void banner(FILE* fp) {
       "                                                       \n"
       ;
   fputs(string, fp);
+#ifndef NDEBUG
+  const char* debug =
+      "-------------------------------------------------------\n"
+      "|                                                     |\n"
+      "|                                                     |\n"
+      "|                DEBUG  MODE                          |\n"
+      "|                                                     |\n"
+      "|                                                     |\n"
+      "-------------------------------------------------------\n"
+      ;
+  fputs(debug, fp);
+#endif
 };
 
 typedef enum {
@@ -93,7 +105,7 @@ class OutputAnnotationString{
     } else if (f == "epact") {
       this->annotationString = OutputAnnotationString::epactAnnotationString;
     } else {
-      fprintf(stderr, "Cannot recoginized format: [ %s ]!", format);
+      fprintf(stderr, "Cannot recoginized format: [ %s ]!\n", format);
     };;
   };
   const char* operator [] (const int idx) {
@@ -182,14 +194,18 @@ struct Priority{
   // Level is just a wrapper for int, we use it only for type checking.
   struct Level{
     Level(int i):level(i){};
-    int level;
     bool operator<(const Priority::Level& l) const{
+      // fprintf(stderr, "called <1: %d, %d \n", this->level, l.level);      
       return this->level < l.level;
     };
     bool operator==(const Priority::Level& l) const{
       return this->level == l.level;
     };
-  };    
+    void dump() {
+      fprintf(stderr, "level = %d\n", this->level);
+    };
+    int level;
+  };     // end struct Level
   int open(const char* fileName) {
     // Load priority.txt
     this->priorityIdx = 0;
@@ -282,7 +298,18 @@ class AnnotationResult{
   };
   void sortByPriority(const Priority& p) {
     Comparator compareFunction(p);
+    // for (size_t i = 0; i < this->type.size(); ++i) {
+    //   fprintf(stderr, "%zu -> %s ", i, AnnotationString[type[i]]);
+    //   p.getPriority(type[i]).dump();
+    // };
+    // puts("-----");
+    // fprintf(stderr, " sort %d elements: \n", this->type.end() - this->type.begin());
     std::sort(this->type.begin(), this->type.end(), compareFunction);
+    // for (size_t i = 0; i < this->type.size(); ++i) {
+    //   fprintf(stderr, "%zu -> %s ", i, AnnotationString[type[i]]);
+    //   p.getPriority(type[i]).dump();
+    // };
+    // exit(1);
   };
 
   //////////////////////////////////////////////////////////////////////
@@ -323,13 +350,21 @@ class AnnotationResult{
   std::vector<AnnotationType> type;
   std::map<AnnotationType, std::string> detail;
 
-  class Comparator{
-   public:
+  struct Comparator{
     Comparator(const Priority& p): priority(p) {
+      //fprintf(stderr, "create priority comparator\n");
     };
     bool operator() (const AnnotationType& t1,
-                     const AnnotationType& t2) {
-      this->priority.getPriority(t1) < this->priority.getPriority(t2);
+                     const AnnotationType& t2) const {
+      // this->priority.getPriority(t1) .dump();
+      // this->priority.getPriority(t2) .dump();
+      // fprintf(stderr, "do comparing\n");
+
+      // const Priority::Level& l1 = this->priority.getPriority(t1);
+      // const Priority::Level& l2 = this->priority.getPriority(t2);
+      // return (l1 < l2 );
+
+      return (this->priority.getPriority(t1)) < (this->priority.getPriority(t2));
     };
    private:
     const Priority& priority;
@@ -696,8 +731,10 @@ class GeneAnnotation{
             if (this->bedReader[br]->find(chr.c_str(), pos, &bedString)){
               fputs(";", fout);
               fputs(this->bedTag[br].c_str(), fout);
-              fputs("=", fout);
-              fputs(stringJoin(bedString, ',').c_str(), fout);
+              if (!bedString.empty())  {
+                fputs("=", fout);
+                fputs(stringJoin(bedString, ',').c_str(), fout);
+              }
             }
           }
           for (size_t gs = 0; gs < this->genomeScore.size(); ++ gs) {
@@ -749,6 +786,7 @@ class GeneAnnotation{
 
       // output annotation result
       // VCF info field is the 8th column
+      std::vector<std::string> bedString;      
       for (unsigned int i = 0; i < field.size(); i++ ){
         fputs(field[i].c_str(), fout) ;
         fputs("\t", fout);
@@ -756,6 +794,23 @@ class GeneAnnotation{
       fputs(outputter.getTopPriorityAnnotation().c_str(), fout);
       fputs("\t", fout);
       fputs(outputter.getFullAnnotation().c_str(), fout);
+
+      for (size_t br = 0; br < this->bedReader.size(); ++ br) {
+        if (this->bedReader[br]->find(chr.c_str(), pos, &bedString)){
+          fputs("\t", fout);
+          fputs(this->bedTag[br].c_str(), fout);
+          if (!bedString.empty())  {
+            fputs("=", fout);
+            fputs(stringJoin(bedString, ',').c_str(), fout);
+          }
+        }
+      }
+      for (size_t gs = 0; gs < this->genomeScore.size(); ++ gs) {
+        fputs("\t", fout);
+        fputs(this->genomeScoreTag[gs].c_str(), fout);
+        fputs("=", fout);
+        fprintf(fout, "%.3f", this->genomeScore[gs]->baseScore(chr.c_str(), pos));
+      }
       fputc('\n', fout);
     }
     // close output
@@ -824,6 +879,7 @@ class GeneAnnotation{
 
       // output annotation result
       // VCF info field is the 8th column
+      std::vector<std::string> bedString;      
       for (unsigned int i = 0; i < field.size(); i++ ){
         fputs(field[i].c_str(), fout) ;
         fputs("\t", fout);
@@ -831,6 +887,23 @@ class GeneAnnotation{
       fputs(outputter.getTopPriorityAnnotation().c_str(), fout);
       fputs("\t", fout);
       fputs(outputter.getFullAnnotation().c_str(), fout);
+
+      for (size_t br = 0; br < this->bedReader.size(); ++ br) {
+        if (this->bedReader[br]->find(chr.c_str(), pos, &bedString)){
+          fputs("\t", fout);
+          fputs(this->bedTag[br].c_str(), fout);
+          if (!bedString.empty())  {
+            fputs("=", fout);
+            fputs(stringJoin(bedString, ',').c_str(), fout);
+          }
+        }
+      }
+      for (size_t gs = 0; gs < this->genomeScore.size(); ++ gs) {
+        fputs("\t", fout);
+        fputs(this->genomeScoreTag[gs].c_str(), fout);
+        fputs("=", fout);
+        fprintf(fout, "%.3f", this->genomeScore[gs]->baseScore(chr.c_str(), pos));
+      }
       fputc('\n', fout);
     }
     // close output
@@ -902,6 +975,7 @@ class GeneAnnotation{
         fputs("\t", fout);
         fputs(field[i].c_str(), fout) ;
       }
+      // not output BED or GenomeScore
       fputc('\n', fout);
     }
     // close output
@@ -1690,7 +1764,7 @@ int main(int argc, char *argv[])
     AnnotationString.setFormat(FLAG_outputFormat.c_str());
   }
   else {
-    AnnotationString.setFormat(FLAG_outputFormat.c_str());    
+    AnnotationString.setFormat("default");    
   };
   if (!FLAG_bedFile.empty()) {
     fprintf(stderr, "Use bed file: %s\n", FLAG_bedFile.c_str() );

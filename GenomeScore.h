@@ -21,7 +21,7 @@ public:
     while (lr.readLineBySep(&fd, "\t ")) {
       value = toFloat(fd[1]);
       if (fwrite(&value, sizeof(float), 1, fp) == 0) {
-        fprintf(stderr, "Cannot write base position %s:%d in %s", chrom, lineNo, outFile);
+        fprintf(stderr, "Cannot write base position %s:%d in %s\n", chrom, lineNo, outFile);
         return -1;
       } else {
         ++lineNo;
@@ -40,7 +40,7 @@ public:
       std::string fname = dir + "/chr" + chrom + ".fbin";
       FILE* fp = fopen(fname.c_str(),"rb");
       if ( fp == NULL ) {
-        fprintf(stderr, "Cannot open genomeScore file %s",fname.c_str());
+        fprintf(stderr, "Cannot open genomeScore file %s\n",fname.c_str());
         return false;
       }
       fpmap[chrom] = fp;
@@ -77,12 +77,12 @@ GenomeScore(const char* _dir) : dir(_dir) {}
     openChr(chrom);
     FILE* fp = fpmap[chrom];
     if ( fseek(fp, (pos-1)*4, SEEK_SET) != 0 ) {
-      fprintf(stderr, "Cannot access base position %s:%d in %s",chrom,pos,dir.c_str());
+      fprintf(stderr, "Cannot access base position %s:%d in %s\n",chrom,pos,dir.c_str());
       return 0;
     }
     float ret;
     if ( fread(&ret,sizeof(float),1,fp) == 0 ) {
-      fprintf(stderr, "Cannot read base position %s:%d in %s",chrom,pos,dir.c_str());
+      fprintf(stderr, "Cannot read base position %s:%d in %s\n",chrom,pos,dir.c_str());
       return 0;
     }
     //error("baseScore(%s,%d)=%f",chrom,pos,ret);
@@ -92,7 +92,7 @@ GenomeScore(const char* _dir) : dir(_dir) {}
   float baseScore(const char* markerID) {
     char* pcolon = strchr((char*)markerID,':');
     if ( pcolon == NULL) {
-      fprintf(stderr, "Cannot parse marker %s in %s",markerID,dir.c_str());
+      fprintf(stderr, "Cannot parse marker %s in %s\n",markerID,dir.c_str());
       return 0;
     }
     std::string chrom(markerID,pcolon-markerID);

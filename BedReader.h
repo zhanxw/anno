@@ -40,14 +40,16 @@ class BedReader {
  public:
   int open(const char* fn){
     LineReader lr(fn);
+    std::string line;
     std::vector<std::string> fd;
 
     int totalRegion = 0;
     Region region;
     int& beg = region.beg;
     int& end = region.end;
-    while (lr.readLineBySep(&fd, "\t ")){
-      if (fd[0][0] == '#' || fd.size() != 4)
+    while (lr.readLine(&line)) {
+      stringNaturalTokenize(line, "\t ", &fd);
+      if (fd[0][0] == '#' || fd.size() < 3) // at least: chrom beg end [optional_label]
         continue;
       std::string& chrom = fd[0];
       if (!str2int(fd[1].c_str(), &beg)){
@@ -58,7 +60,8 @@ class BedReader {
         fprintf(stderr, "Cannot convert [ %s ]\n", fd[2].c_str());
         continue;
       }
-      region.label = fd[3];
+      if (fd.size() >= 4) // default label is empty.
+        region.label = fd[3];
       
       this->data[chrom].push_back(region);
       totalRegion ++;
@@ -70,6 +73,8 @@ class BedReader {
 
   /**
    * @return >=1 if find; or 0 if not find
+   * @param ret_label: store all non-empty labels
+   * NOTE:
    */
   int find(const char* chrom, int pos,
            std::vector<std::string>* ret_label) const {
@@ -103,11 +108,13 @@ class BedReader {
     for (size_t i = 0; i < index.size(); ++i ) {
       const Region& r = (iterRegion->second)[index[i]];
       if (inRegion(pos, r)) {
+        ++ nFound;
         // printf("i = %zu, pos = %d, beg = %d, end = %d\n", i, pos, r.beg, r.end);
-        ret_label->push_back ( r.label);
+        if (!r.label.empty()) 
+          ret_label->push_back ( r.label);
       }
     }
-    return ret_label->size();
+    return nFound;
   };
   void dump() {
     puts("--------------------");

@@ -3,7 +3,7 @@ DEFAULT_CXXFLAGS = -D__STDC_LIMIT_MACROS
 
 .PHONY: release debug
 all: debug
-release: CXXFLAGS = -O2 $(DEFAULT_CXXFLAGS)
+release: CXXFLAGS = -O2 -DNDEBUG $(DEFAULT_CXXFLAGS)
 release: $(EXEC)
 	-mkdir -p executable
 	cp -f $(EXEC) executable
@@ -50,6 +50,13 @@ test5: debug
 test6: debug
 	(cd example; ../$(EXEC) -i input.epacts --inputFormat epacts -r ../resources/human.g1k.v37.fa -f refGene -g ../resources/refGene.txt.gz -c ../codon.txt -o output.epacts --outputFormat epact -p ../priority.epact.txt)
 	(cd example; diff {correct,output}.epacts)
+
+test7: debug
+	(cd example; ../$(EXEC) -i input.test.vcf -r test.fa -g test.gene.txt -c ../codon.txt -o output.test.region.vcf --bed REGION1=region1.bed)
+#	(cd example; diff {correct,output}.test.vcf)
+
+test8: debug
+	(cd example; ../$(EXEC) -i input.test.vcf -r test.fa -g test.gene.txt -c ../codon.txt -o output.test.region.vcf --bed REGION1=region1.bed,REGION2=region2.bed)
 
 test: test1 test2 test3 test4 test5 test6
 
