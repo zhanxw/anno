@@ -45,7 +45,12 @@ void banner(FILE* fp) {
       "|                                                     |\n"
       "|                                                     |\n"
       "|                DEBUG  MODE                          |\n"
+      "|   try:                                              |\n"
+      "|      make clean; make release                       |\n"
       "|                                                     |\n"
+      "|   to get release version.                           |\n"
+      "|   then run:                                         |\n"
+      "|      ./executable/anno                              |\n"
       "|                                                     |\n"
       "-------------------------------------------------------\n"
       ;

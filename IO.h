@@ -10,6 +10,8 @@
 #include <vector>
 #include <exception>
 
+#define UNUSED(x) ((void)(x))
+
 class FileNotExistException: public std::exception{
   public:
     FileNotExistException(const char* fileName){
@@ -266,7 +268,8 @@ FileReader::FileType FileReader::checkFileType(const char* fileName){
     FILE* fp = fopen(fileName, "r");
     if (!fp) return UNKNOWN;
     unsigned char header[2]={0,0};
-    fread(header, sizeof(char), 2, fp);
+    int ret = fread(header, sizeof(char), 2, fp);
+    UNUSED(ret);
     fclose(fp);
     // check file types
     if ( header[0] == gz_magic[0] && header[1] == gz_magic[1]) {
