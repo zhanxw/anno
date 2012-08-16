@@ -78,7 +78,7 @@ public:
   explicit Chromosome(FILE* faFile, Faidx::Info* info): fp(faFile), info(info) {
   };
   explicit Chromosome():fp(NULL), info(NULL){};
-  explicit Chromosome(const Chromosome& chrom) {
+  Chromosome(const Chromosome& chrom) {
     this->fp = chrom.fp;
     this->info = chrom.info;
   };
