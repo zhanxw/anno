@@ -3,6 +3,8 @@ Contents
 
 [Introduction](#Introduction)
 
+[Quick tutorial](#Quick_tutorial)
+
 [Where to Find It](#Where_to_Find_It)
 
 [Usage](#Usage)
@@ -23,15 +25,78 @@ Introduction
 ============
 
 Anno is short for "annotation", it is used for annotate variants. Our
-goal is to provide abundant information for the variant. For example, it
-can annotate different transcripts of the same genes. Anno support
-various file format: VCF file, plain file, plink association output file
-and epacts file.
+goal is to provide abundant information for genetic variants promptly.
+For example, annotations to all transcripts of a gene will be provided
+instead of just listing one single annotation. Anno support various file
+format: VCF file, plain file, plink association output file and
+[epacts](http://genome.sph.umich.edu/wiki/EPACTS "http://genome.sph.umich.edu/wiki/EPACTS")
+file.
+
+Quick tutorial
+==============
+
+You have an input file in VCF format, and your goal is to annotate it
+using refFlat genes database. Then you just need the following command:
+
+     anno -i input.vcf -o output.vcf -r hs37d5.fa -g refFlat_hg19.txt.gz -p priority.txt -c codon.txt
+
+Required files:
+
+-   [hs37d5.fa](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/hs37d5.fa "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/hs37d5.fa")
+    Reference genome in NCBI build 37 (you also need to download
+    [hs37d5.fai](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/hs37d5.fa.fai "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/hs37d5.fa.fai")
+    )
+
+-   [refFlag\_hg19.txt.gz](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz")
+    Gene database in refFlat format (from UCSC website). You can also
+    use [Gencode version
+    7](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat.gencode.v7.gz "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat.gencode.v7.gz")
+    or [Gencode version
+    11](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat.gencode.v11.gz "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat.gencode.v11.gz").
+
+-   [codon.txt](http://www.sph.umich.edu/csg/zhanxw/software/anno/codon.txt "http://www.sph.umich.edu/csg/zhanxw/software/anno/codon.txt")
+    Human codon table.
+
+-   [priority.txt](http://www.sph.umich.edu/csg/zhanxw/software/anno/priority.txt "http://www.sph.umich.edu/csg/zhanxw/software/anno/priority.txt")
+    Priority file, which determines wich annotation type is more
+    important
+
+Outputs:
+
+Annotated VCF will be named *output.vcf*. Annotations comes in two tags:
+ANNO and ANNOFULL. The first tag ANNO showed the most important
+annotation types (determined by priority file); the second tag ANNOFULL
+showed detailed annotations. Let's see one example annotation:
+
+    ANNO=Nonsynonymous:GENE1|GENE3;ANNOFULL=GENE1/CODING_GENE:+:Nonsynonymous(CCT/Pro/P->CAT/His/H:Base3/30:Codon1/10:Exon1/5):Normal_Splice_Site:Exon|GENE3/CODING_GENE:-:Nonsynonymous(AGG/Arg/R->ATG/Met/M:Base30/30:Codon10/10:Exon5/5):Normal_Splice_Site:Exon|GENE2/NON_CODING_GENE:+:Upstream
+
+ANNO tag displayed the most important variant type is *Nonsynonymous*
+and that happened at GENE1 and GENE3; ANNOFULL tag is the full set of
+annotation and it consists of two parts, for GENE1 and GENE3
+respectively. The first part is for GENE1:
+
+    GENE1/CODING_GENE:+:Nonsynonymous(CCT/Pro/P->CAT/His/H:Base3/30:Codon1/10:Exon1/5):Normal_Splice_Site:Exon
+
+The format can be explained by sections, and we use annotation for GENE1
+as an example:
+
+-   GENE1 : gene name
+-   CODING\_GENE : transcript name
+-   *+* : forward strand
+-   Nonsynonymous, Normal\_Splice\_Site, Exon : various annotation types
+-   CCT/Pro/P-\>CAT/His/H : Proline to Histidine mutation
+-   Base3/30 : mutation happens on the 3rd base of the total 10 bases
+-   Codon1/10 : mutation happens on the 1st codon of the total 10 codons
+-   Exon1/5 : mutation happens on the 1st exon of the total 5 exons
 
 Where to Find It
 ================
 
-The compiled executable file is at:
+Anno code is hosted online
+[anno](https://github.com/zhanxw/anno "https://github.com/zhanxw/anno").
+You can download the source and compile (type 'make release').
+
+For CSG internal users, the compiled executable file is at:
 /net/fantasia/home/zhanxw/anno/executable/anno
 
 The source code is located at:/net/fantasia/home/zhanxw/anno You can
@@ -148,9 +213,20 @@ default codon file:
 <!-- -->
 
     -u how far apart from 5'-end of the gene are counted as upstream
-    -d how far apart from 3'-end of the gene are counted as upstream
+    -d how far apart from 3'-end of the gene are counted as downstream
+
+The *-u* and *-d* parameters define the range of upstream and
+downstream.
+
     -se how far apart from 5'-end of the gene are counted as upstream
     -si how far apart from 3'-end of the gene are counted as upstream
+
+The *-se* and *-si* defines the splice region. By default, 3 bases into
+the exon and 8 bases into the introns are defined as splicing sites. If
+mutations happen in these regions, we will annotate it as
+"Normal\_Splice\_Site" unless the mutations happens in the traditionally
+important "GU...AG" region in the intron, in that case, we will
+"Essential\_Splice\_Site" as annotation.
 
 Example
 =======
@@ -169,7 +245,7 @@ can invoke anno using the following command line:
 
 Sample outputs are listed below:
 
-\1) Annotated VCF file, *test.out.vcf*
+​1) Annotated VCF file, *test.out.vcf*
 
     #VCF_test
     #from http://www.sph.umich.edu/csg/liyanmin/vcfCodingSnps/Tutorial.shtml
@@ -190,7 +266,7 @@ annotation format is defined as following:
 ":" separates within gene annotation in the following order: gene,
 strand, exon/intron, details.
 
-\2) Statistics files:
+​2) Statistics files:
 
 Four frequency table will be generated after annotation. For example:
 
@@ -241,7 +317,6 @@ Four frequency table will be generated after annotation. For example:
     3       1
     -3      1
 
-
 Contact
 =======
 
@@ -249,3 +324,9 @@ Questions and requests should be sent to Xiaowei Zhan
 ([zhanxw@umich.edu](mailto:zhanxw@umich.edu "mailto:zhanxw@umich.edu"))
 or Goncalo Abecasis
 ([goncalo@umich.edu](mailto:goncalo@umich.edu "mailto:goncalo@umich.edu"))
+
+Author sincerly appreicate Yanming Li for his wonderful tutorial on gene
+annotation software
+[vcfCodingSnps](http://www.sph.umich.edu/csg/liyanmin/vcfCodingSnps/Tutorial.shtml "http://www.sph.umich.edu/csg/liyanmin/vcfCodingSnps/Tutorial.shtml"),
+and Hyun Ming Kang for his code related to genome scores and his
+consistent suggestions and feedbacks.
