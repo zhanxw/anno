@@ -1,9 +1,13 @@
 #ifndef _GENEFORMAT_H_
 #define _GENEFORMAT_H_
-//TODO
-//Use format.txt to flexible specify inputs
+
+/**
+ * The following format all use 0-based index
+ * 
+ */
 class GeneFormat{
 public:
+  /// WASH7P	NR_024540	chr1	-	14361	29370	29370	29370	11	14361,14969,15795,16606,16857,17232,17605,17914,18267,24737,29320,	14829,15038,15947,16765,17055,17368,17742,18061,18366,24891,29370,
   void setRefFlatFormat(){
     this->geneNameCol.clear();
     this->geneNameCol.push_back(0);
@@ -28,6 +32,7 @@ public:
    uc010nxq.1      chr1    +       11873   14409   12189   13639   3       11873,12594,13402,      12227,12721,14409,      B7ZGX9    uc010nxq.1
 
    *
+   * Schema: http://genome.csdb.cn/cgi-bin/hgTables?db=rn4&hgta_group=genes&hgta_track=knownGene&hgta_table=knownGene&hgta_doSchema=describe+table+schema
    */
   void setUCSCKnownGeneFormat(){
     this->geneNameCol.clear();

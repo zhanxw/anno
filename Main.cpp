@@ -43,14 +43,14 @@ void banner(FILE* fp) {
   const char* debug =
       "-------------------------------------------------------\n"
       "|                                                     |\n"
-      "|                                                     |\n"
       "|                DEBUG  MODE                          |\n"
-      "|   try:                                              |\n"
-      "|      make clean; make release                       |\n"
+      "|                (slow mode)                          |\n"
       "|                                                     |\n"
-      "|   to get release version.                           |\n"
+      "|   Try:                                              |\n"
+      "|      make clean; make release                       |\n"
       "|   then run:                                         |\n"
       "|      ./executable/anno                              |\n"
+      "|   to use release/fast version                       |\n"
       "|                                                     |\n"
       "-------------------------------------------------------\n"
       ;
@@ -597,12 +597,16 @@ class GeneAnnotation{
     std::string s = toLower(f);
     if (s == "refflat") {
       this->format.setRefFlatFormat();
+      LOG << "Input gene format: refFlat\n";
     } else if (s == "knowngene") {
       this->format.setUCSCKnownGeneFormat();
+      LOG << "Input gene format: knownGene\n";      
     } else if (s == "refgene") {
       this->format.setRefGeneFormat();
+      LOG << "Input gene format: refGene\n";      
     } else {
       fprintf(stderr, "Unknown format (other than refFlat, knownGene, refGene)!\nNow quitting...\n");
+      LOG << "Input gene format is wrong!\n";      
       abort();
     }
   };
@@ -1810,14 +1814,26 @@ int main(int argc, char *argv[])
 
   ga.setFormat(FLAG_geneFileFormat);
   ga.setCheckReference(FLAG_checkReference);
+
+  std::string inputFormat = toLower(FLAG_inputFormat);
+  if (!inputFormat.empty() &&
+      inputFormat != "vcf" &&
+      inputFormat != "plain" &&
+      inputFormat != "plink" &&
+      inputFormat != "epacts") {
+    fprintf(stderr, "Unsupported input format [ %s ], we support VCF, plain, plink and EPACTS formats.\n", FLAG_inputFormat.c_str());
+    LOG << "Unsupported input format [ " << FLAG_inputFormat << " ], we support VCF, plain, plink and EPACTS formats.\n";
+    abort();
+  };
+
   ga.openGeneFile(FLAG_geneFile.c_str());
-  if (toLower(FLAG_inputFormat) == "vcf" || FLAG_inputFormat.size() == 0) {
+  if (inputFormat == "vcf" || FLAG_inputFormat.size() == 0) {
     ga.annotateVCF(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
-  } else if (toLower(FLAG_inputFormat) == "plain") {
+  } else if (inputFormat == "plain") {
     ga.annotatePlain(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
-  } else if (toLower(FLAG_inputFormat) == "plink") {
+  } else if (inputFormat == "plink") {
     ga.annotatePlink(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
-  } else if (toLower(FLAG_inputFormat) == "epacts") {
+  } else if (inputFormat == "epacts") {
     ga.annotateEpacts(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
   } else{
     fprintf(stderr, "Cannot recognize input file format: %s \n", FLAG_inputFile.c_str());
