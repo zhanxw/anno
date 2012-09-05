@@ -47,6 +47,7 @@ int stringNaturalTokenize(const std::string& str, const char delim, std::vector<
 
 //remove leading and trailing characters
 void stringStrip(std::string* input, const char* characters = " ") {
+  if (!input || !input->size()) return;
     size_t beg = input->find_first_not_of(characters);
     size_t end = input->find_last_not_of(characters);
     input->assign( input->substr(beg, end - beg + 1) );
