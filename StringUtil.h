@@ -132,5 +132,16 @@ const char* toStr(const double d) {
     return _bufferStr;
 };
 
+void tolower(std::string* s) {
+  for (std::string::iterator i = s->begin();
+       i != s->end();
+       ++i)
+    (*i) = tolower(*i);
+};
 
+std::string tolower(const std::string& s) {
+  std::string ret(s);
+  tolower(&ret);
+  return ret;
+};
 #endif /* _STRINGUTIL_H_ */

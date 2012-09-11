@@ -27,6 +27,8 @@
 #include "GeneAnnotation.h"
 #include "BedReader.h"
 #include "GenomeScore.h"
+#include "ModelParser.h"
+#include "TabixReader.h"
 
 void banner(FILE* fp) {
   const char* string =
@@ -104,6 +106,9 @@ class AnnotationInputFile{
     this->lr = new LineReader(inputFileName);
   };
   ~AnnotationInputFile() {
+    this->close();
+  }
+  void close() {
     if (this->lr) {
       delete lr;
       this->lr = NULL;
@@ -284,14 +289,19 @@ class AnnotationInputFile{
 
 class AnnotationOutputFile{
  public:
-  AnnotationOutputFile(const char* out):headerOutputted(false) {
+  AnnotationOutputFile(const char* out):headerOutputted(false), totalVariants(0),outputFileName(out) {
     this->fout = fopen(out, "wt");
     if (!this->fout) {
       fprintf(stderr, "Cannot open otuput file %s for write.\n", out);
     };
   };
   ~AnnotationOutputFile() {
+    this->close();
+  }
+  void close() {
     if (this->fout) {
+      fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
+      fprintf(stdout, "DONE: Generated annotation output in [ %s ].\n", outputFileName.c_str());
       fclose(this->fout);
       this->fout = NULL;
     }
@@ -376,11 +386,15 @@ class AnnotationOutputFile{
         break;
     };
     fputc('\n', this->fout);
+    ++this->totalVariants;
   };
  private:
+  bool headerOutputted;
   const AnnotationInputFile* aif;
   FILE* fout;
-  bool headerOutputted;
+  int totalVariants;
+  std::string outputFileName;
+
 }; // class AnnotationOutputFile
 
 // run annotations (gene based, bed file, genomeScores, tabix database)
@@ -396,6 +410,11 @@ class AnnotationController{
     for (size_t i = 0; i < genomeScore.size(); ++i ) {
       delete genomeScore[i];
     };
+    for (size_t i = 0; i < tabixReader.size(); ++i ) {
+      delete tabixReader[i];
+    };
+
+    
   };
   void openBedFile(const char* tag, const char* fn) {
     // check duplication
@@ -435,6 +454,9 @@ class AnnotationController{
     this->genomeScore.push_back(p);
   };
 
+  void addTabixReader(TabixReader* t) {
+    this->tabixReader.push_back(t);
+  };
   // /**
   //  * parse input file, and call annotate, and then output results
   //  */
@@ -765,6 +787,14 @@ class AnnotationController{
     for (size_t gs = 0; gs < this->genomeScore.size(); ++ gs) {
       this->result[this->genomeScoreTag[gs]] = toStr(this->genomeScore[gs]->baseScore(chrom.c_str(), pos));
     }
+    for (size_t tb = 0; tb < this->tabixReader.size(); ++ tb) {
+      TabixReader& tabix = *this->tabixReader[tb];
+      tabix.addAnnotation(chrom, pos, ref, alt);
+      size_t s = tabix.getTag().size();
+      for (size_t i = 0; i < s; ++i) {
+        this->result[tabix.getTag()[i]] = tabix.getAnnotation()[i];
+      }
+    }
   };
 
   const OrderedMap<std::string, std::string>& getResult() const {
@@ -780,7 +810,7 @@ class AnnotationController{
   std::vector<std::string> bedTag;
   std::vector<GenomeScore*> genomeScore;
   std::vector<std::string> genomeScoreTag;
-
+  std::vector<TabixReader*> tabixReader;
   OrderedMap<std::string, std::string> result; // store all types of annotation results
 };
 
@@ -793,11 +823,11 @@ int main(int argc, char *argv[])
       ADD_PARAMETER_GROUP(pl, "Required Parameters")
       ADD_STRING_PARAMETER(pl, inputFile, "-i", "Specify input VCF file")
       ADD_STRING_PARAMETER(pl, outputFile, "-o", "Specify output VCF file")
+      ADD_PARAMETER_GROUP(pl, "Gene Annotation Parameters")
       ADD_STRING_PARAMETER(pl, geneFile, "-g", "Specify gene file")
-      ADD_PARAMETER_GROUP(pl, "Optional Parameters")
+      ADD_STRING_PARAMETER(pl, referenceFile, "-r", "Specify reference genome position")      
       ADD_STRING_PARAMETER(pl, inputFormat, "--inputFormat", "Specify format (default: vcf). \"-f plain \" will use first 4 columns as chrom, pos, ref, alt")
       ADD_BOOL_PARAMETER(pl, checkReference, "--checkReference", "Check whether reference alleles matches genome reference")
-      ADD_STRING_PARAMETER(pl, referenceFile, "-r", "Specify reference genome position")
       ADD_STRING_PARAMETER(pl, geneFileFormat, "-f", "Specify gene file format (default: refFlat, other options: knownGene, refGene)")
       ADD_STRING_PARAMETER(pl, priorityFile, "-p", "Specify priority of annotations")
       ADD_STRING_PARAMETER(pl, codonFile, "-c", "Specify codon file (default: codon.txt)")
@@ -806,9 +836,10 @@ int main(int argc, char *argv[])
       ADD_INT_PARAMETER(pl, spliceIntoExon, "--se", "Specify splice into extron range (default: 3)")
       ADD_INT_PARAMETER(pl, spliceIntoIntron, "--si", "Specify splice into intron range (default: 8)")
       ADD_STRING_PARAMETER(pl, outputFormat, "--outputFormat", "Specify predefined annotation words (default or epact)")
-      ADD_PARAMETER_GROUP(pl, "Additional Functions")
+      ADD_PARAMETER_GROUP(pl, "Other Annotation Tools")
       ADD_STRING_PARAMETER(pl, genomeScore, "--genomeScore", "Specify the folder of genome score (e.g. GERP=dirGerp/,SIFT=dirSift/)")
       ADD_STRING_PARAMETER(pl, bedFile, "--bed", "Specify the bed file and tag (e.g. ONTARGET1=a1.bed,ONTARGET2=a2.bed)")
+      ADD_STRING_PARAMETER(pl, tabixFile, "--tabix", "Specify the tabix file and tag (e.g. abc.txt.gz(chrom=1,pos=7,ref=3,alt=4,SIFT=7,PolyPhen=10)")      
       END_PARAMETER_LIST(pl)
       ;
 
@@ -827,11 +858,6 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Please specify output file\n");
     exit(1);
   }
-  if (FLAG_geneFile.empty()) {
-    pl.Help();
-    fprintf(stderr, "Please specify gene file\n");
-    exit(1);
-  }
 
   GeneAnnotationParam param;
   param.upstreamRange = FLAG_upstreamRange ? FLAG_upstreamRange : 50;
@@ -845,7 +871,20 @@ int main(int argc, char *argv[])
   LOG_PARAMETER(pl);
 
   pl.Status();
-
+  if (FLAG_REMAIN_ARG.size() > 0){
+    fprintf(stderr, "Unparsed arguments: ");
+    for (unsigned int i = 0; i < FLAG_REMAIN_ARG.size(); i++){
+      fprintf(stderr, " %s", FLAG_REMAIN_ARG[i].c_str());
+    }
+    abort();
+  }
+  
+  if (FLAG_geneFile.empty()) {
+    pl.Help();
+    fprintf(stderr, "Please specify gene file\n");
+    exit(1);
+  }
+  
   if (FLAG_priorityFile.empty()) {
     fprintf(stderr, "Use default priority file: /net/fantasia/home/zhanxw/anno/priority.txt\n");
     FLAG_priorityFile = "/net/fantasia/home/zhanxw/anno/priority.txt";
@@ -912,8 +951,37 @@ int main(int argc, char *argv[])
         exit(1);
       };
     };
-  };
-
+  }
+  // parse something like:
+  // abc.txt.gz(chrom=1,pos=7,ref=3,alt=4,SIFT=7,PolyPhen=10)
+  if(!FLAG_tabixFile.empty()){
+    fprintf(stderr, "Use tabix file: %s\n", FLAG_tabixFile.c_str() );    
+    ModelParser mp;
+    mp.parse(FLAG_tabixFile);
+    std::string fn = mp.getName();
+    int chrom, pos, ref, alt;
+    mp.assign("chrom", &chrom).assign("pos", &pos).assign("ref", &ref).assign("alt", &alt);
+    fprintf(stderr, "Column %d, %d, %d and %d in tabix file will be matched to chromosome, position, reference allele, alternative allele respectively.\n", chrom, pos, ref, alt);
+    TabixReader* tabix = new TabixReader(fn.c_str(), chrom, pos, ref, alt);
+    
+    for (size_t i = 0; i < mp.getParam().size(); ++i) {
+      if ( toLower(mp.getParam()[i]) == "chrom" ||
+           toLower(mp.getParam()[i]) == "pos" ||
+           toLower(mp.getParam()[i]) == "ref" ||
+           toLower(mp.getParam()[i]) == "alt") {
+        continue;
+      }
+      int intValue;
+      if (str2int(mp.getValue(i), &intValue)) {
+        tabix->addTag(mp.getParam()[i], intValue);
+        fprintf(stderr, "Tag %s will be from column %d in tabix file\n", mp.getParam()[i].c_str(), intValue);
+      } else {
+        tabix->addTag(mp.getParam()[i], mp.getValue(i));
+        fprintf(stderr, "Tag %s will be from column %s (from header) in tabix file\n", mp.getParam()[i].c_str(), mp.getValue(i).c_str());        
+      }
+    }
+    controller.addTabixReader(tabix);
+  }
   // if (inputFormat == "vcf" || FLAG_inputFormat.size() == 0) {
   //   ga.annotateVCF(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
   // } else if (inputFormat == "plain") {
@@ -937,13 +1005,14 @@ int main(int argc, char *argv[])
     controller.annotate(chrom, pos, ref, alt);
     aof.writeResult(controller.getResult());
   };
-  // aof.writeResult(controller.getResult()); will add this to handle when input only have comment lines
+  // aof.writeResult(controller.getResult()); // TODO: will add this to handle when input only have comment lines
   
   // output stats
   controller.geneAnnotation.outputAnnotationStats(FLAG_outputFile.c_str());
 
-  // aof.close();
-  // aif.close();
+  aof.close();
+  aif.close();
+  LOG << "Annotate " << FLAG_inputFile << " to " << FLAG_outputFile << " succeed!\n";
 
   LOG_END_TIME;
   LOG_END ;

@@ -54,6 +54,9 @@ class OrderedMap{
       keyVec.clear();
       keyTypeMap.clear();
     };
+    const std::vector<KEY>& getKey() const{
+      return this->keyVec;
+    };
   private:
     std::vector < KEY > keyVec;
     std::map < KEY, TYPE > keyTypeMap;

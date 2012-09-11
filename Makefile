@@ -1,6 +1,10 @@
 EXEC = anno
 DEFAULT_CXXFLAGS = -D__STDC_LIMIT_MACROS
 
+LIB = third/tabix/libtabix.a
+third/tabix/libtabix.a:
+	(cd third; make tabix)
+
 .PHONY: release debug
 all: debug
 release: CXXFLAGS = -O2 -DNDEBUG $(DEFAULT_CXXFLAGS)
@@ -14,7 +18,7 @@ profile: $(EXEC)
 
 $(EXEC): Main.cpp Gene.h Range.h IO.h Argument.h FreqTable.h GenomeSequence.h LogFile.h StringTemplate.h
 	g++ $(CXXFLAGS) -c Main.cpp
-	g++ $(CXXFLAGS) -o $@ Main.o -lz -lbz2 -lssl -lcrypto
+	g++ $(CXXFLAGS) -o $@ Main.o $(LIB) -lz -lbz2 -lssl -lcrypto
 clean:
 	rm -f *.o $(EXEC) input.*
 # basic test
@@ -66,8 +70,17 @@ testGenomeScore: testGenomeScore.cpp GenomeScore.h
 
 test10: testGenomeScore
 	(cd example; ../testGenomeScore > output.testGenomeScore)
+	(cd example; diff {correct,output}.testGenomeScore)
 
-test: test1 test2 test3 test4 test5 test6 test7 test8 test9
+testTabixReader: testTabixReader.cpp TabixReader.h
+	g++ $(CXXFLAGS) -c testTabixReader.cpp -O0 -ggdb
+	g++ $(CXXFLAGS) -o $@ testTabixReader.o $(LIB) -lz -lbz2 -lssl -lcrypto
+
+test11: testTabixReader 
+	(cd example; ../testTabixReader > output.testTabixReader)
+	(cd example; diff {correct,output}.testTabixReader)
+
+test: test1 test2 test3 test4 test5 test6 test7 test8 test9 test10 test11
 
 correct:
 	@echo "WARNING: Regenerate correct testing files. You have 10 seconds to stop..."
