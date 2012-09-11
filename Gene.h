@@ -222,7 +222,7 @@ public:
       nextPos = currentPos + 1;
       if (!this->isInRange(nextPos, this->cds[*cdsIdx])) {
         (*cdsIdx) ++;
-        if (*cdsIdx >= this->cds.size()) {
+        if (*cdsIdx >= (int)this->cds.size()) {
           return -1;
         }
         nextPos = this->cds[*cdsIdx].start;

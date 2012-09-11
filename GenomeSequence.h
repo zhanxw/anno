@@ -102,8 +102,8 @@ public:
     return info->contigSize;
   };
 private:
-  Faidx::Info* info;
   FILE* fp;
+  Faidx::Info* info;
 };
 
 class GenomeSequence{

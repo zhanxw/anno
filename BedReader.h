@@ -72,9 +72,9 @@ class BedReader {
   };
 
   /**
-   * @return >=1 if find; or 0 if not find
+   * @return >=1 if find; or 0 if not find.
    * @param ret_label: store all non-empty labels
-   * NOTE:
+   * NOTE: Here the BED boundary is defined as left-close, right-open.
    */
   int find(const char* chrom, int pos,
            std::vector<std::string>* ret_label) const {
@@ -126,7 +126,7 @@ class BedReader {
     for (ConstDataIter iter = this->data.begin();
          iter != this->data.end();
          ++iter) {
-      int idx = 0;
+      // int idx = 0;
       for (ConstRegionIter iter2 = iter->second.begin();
            iter2 != iter->second.end();
            ++iter2) {

@@ -16,6 +16,8 @@
 #include "OrderedMap.h"
 #include "TypeConversion.h"
 
+#define UNUSED(x) ((void)(x))
+
 typedef enum PARAMETER_TYPE{
   UNSUPPORTED_TYPE,
   BOOL_TYPE,
@@ -125,6 +127,7 @@ public:
     bool isCommentLine = true;
     while (isCommentLine){
       int ret = fscanf(fp, "%s", line);
+      UNUSED(ret);
       len = strlen(line);
       if (!len) continue;
       for (index = 0; index < len; index++) {
@@ -236,7 +239,7 @@ public:
               username, hostName, ctime(&tt));
     }
     int numFlagOutputted = 0;
-    for (int i = 0; i < this->flagVec.size(); i++){
+    for (size_t i = 0; i < this->flagVec.size(); i++){
       FlagInfo& fi = this->flagInfoMap[i];
       if (fi.isParsed) {
         // separate different flags
@@ -267,7 +270,7 @@ public:
         numFlagOutputted ++;
       }
     }
-    for (int i = 0; i < this->ptrRemainingArg->size(); i++) {
+    for (size_t i = 0; i < this->ptrRemainingArg->size(); i++) {
       // separate different flags
       if (numFlagOutputted)
         fprintf(fp, " ");
@@ -310,7 +313,7 @@ public:
       fout << "# ParameterList created by " << username << " on "<< hostName << " at " << ctime(&tt);
     }
     int numFlagOutputted = 0;
-    for (int i = 0; i < this->flagVec.size(); i++){
+    for (size_t i = 0; i < this->flagVec.size(); i++){
       FlagInfo& fi = this->flagInfoMap[i];
       if (fi.isParsed) {
         // separate different flags
@@ -341,7 +344,7 @@ public:
         numFlagOutputted ++;
       }
     }
-    for (int i = 0; i < this->ptrRemainingArg->size(); i++) {
+    for (size_t i = 0; i < this->ptrRemainingArg->size(); i++) {
       // separate different flags
       if (numFlagOutputted)
         fout << " ";
@@ -568,8 +571,8 @@ public:
         int idx = v[i];
         std::string flag = this->flagVec[idx];
         FlagInfo &fi = this->flagInfoMap[idx];
-        void* data = fi.data;
-        int flagWidth = 0;
+        // void* data = fi.data;
+        // int flagWidth = 0;
 
         if (fi.isLongParam) {
           fprintf(stdout, "%*s%s%s", (int)(FLAG_WIDTH - flag.size() ), "--", flag.c_str(), SEP);
@@ -577,7 +580,7 @@ public:
           fprintf(stdout, "%*s%s%s", (int)(FLAG_WIDTH - flag.size() ), "-", flag.c_str(), SEP);
         }
 
-        for (int docIndex = 0; docIndex < fi.doc.size(); docIndex++) {
+        for (size_t docIndex = 0; docIndex < fi.doc.size(); docIndex++) {
           if (docIndex != 0 && docIndex % DOC_WIDTH == 0) {
             fprintf(stdout, "\n");
             fprintf(stdout, "%*s%s", FLAG_WIDTH, " ", EMPTY_SEP);

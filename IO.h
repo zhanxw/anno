@@ -180,6 +180,7 @@ class Bzip2FileReader: public FileReader{
         char c;
         this->bzerror = BZ_OK;
         int nBuf = BZ2_bzRead(&this->bzerror, this->bzp, &c, sizeof(char));
+        UNUSED(nBuf);
         if (this->bzerror == BZ_OK) {
             return c;
         } else {

@@ -10,7 +10,6 @@
 
 int main(int argc, char *argv[])
 {
-
   BedReader br;
   int r = br.open("test.bed");
   printf("load %d regions\n", r);

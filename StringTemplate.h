@@ -94,7 +94,8 @@ public:
   explicit StringTemplate(const std::string& s) {
     this->parse(s);
   };
-private: // forbid two default copy-constructor
+private:
+  // forbid two default copy-constructor
   StringTemplate(const StringTemplate& s) {
     if (this != &s){
       this->data = s.data;
@@ -105,6 +106,7 @@ private: // forbid two default copy-constructor
     this->clear();
     this->data = s.data;
     this->dict = s.dict;
+    return (*this);
   };
 public:
   StringTemplate& operator= (const char* s) {
@@ -182,10 +184,15 @@ public:
           };
           break;
         case ARRAY:
-          int ret = k.array.translate(str, this->dict);
-          if (ret) {
-            return ret;
-          };
+          {
+            int ret = k.array.translate(str, this->dict);
+            if (ret) {
+              return ret;
+            };
+          }
+          break;
+        case UNDEFINED_KEY:
+          fprintf(stderr, "UNDEFINED_KEY not handled!\n");
           break;
       };
     }
@@ -270,6 +277,9 @@ public:
           } else {
           }
           break;
+        case UNDEFINED_KEY:
+          fprintf(stderr, "UNDEFINED_KEY not handled!\n");
+          break;
       }
       end ++ ;
     };
@@ -285,7 +295,7 @@ int StringTemplate::Array::translate(std::string* str, const std::map<std::strin
   std::string& s = *str;
   std::map<std::string, VALUE>::const_iterator iter;
 
-  unsigned int idx = 0;
+  size_t idx = 0;
   int maxStringArraySize = -1; // less than zero for initialization
   do {
     if (idx)
@@ -308,7 +318,7 @@ int StringTemplate::Array::translate(std::string* str, const std::map<std::strin
               if (maxStringArraySize < 0) {
                 maxStringArraySize = v.array.size();
               } else {
-                if (v.array.size() != maxStringArraySize) {
+                if (v.array.size() != (size_t) maxStringArraySize) {
                     fprintf(stderr, "Unbalanced vector size. Stopped when tranlating %s!\n", k.keyword.c_str());
                 }
               }
@@ -319,15 +329,20 @@ int StringTemplate::Array::translate(std::string* str, const std::map<std::strin
           };
           break;
         case ARRAY:
-          int ret = k.array.translate(str, this->dict);
-          if (ret) {
-            return ret;
-          };
+          {
+            int ret = k.array.translate(str, this->dict);
+            if (ret) {
+              return ret;
+            };
+          }
+          break;
+        case UNDEFINED_KEY:
+          fprintf(stderr, "UNDEFINED_KEY not handled!\n");
           break;
       };
     }
     idx ++;
-  } while (maxStringArraySize >= 0 && idx < maxStringArraySize);
+  } while (maxStringArraySize >= 0 && idx < (size_t)maxStringArraySize);
   return 0;
 };
 int StringTemplate::Array::parse(const char* s, int param_beg, int param_end){
@@ -407,6 +422,10 @@ int StringTemplate::Array::parse(const char* s, int param_beg, int param_end){
         } else {
         }
         break;
+      case UNDEFINED_KEY:
+        fprintf(stderr, "UNDEFINED_KEY not handled!\n");
+        break;
+        
     }
     end ++ ;
   };

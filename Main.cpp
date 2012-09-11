@@ -16,6 +16,7 @@
 #include "StringUtil.h"
 #include "LogFile.h"
 
+#include "Type.h"
 #include "Codon.h"
 #include "GenomeSequence.h"
 #include "Gene.h"
@@ -23,6 +24,7 @@
 #include "SequenceUtil.h"
 #include "FreqTable.h"
 #include "StringTemplate.h"
+#include "GeneAnnotation.h"
 #include "BedReader.h"
 #include "GenomeScore.h"
 
@@ -58,534 +60,336 @@ void banner(FILE* fp) {
 #endif
 };
 
-typedef enum {
-  SNP = 0,
-  INS,
-  DEL,
-  MIXED,
-  SV,
-  UNKNOWN = 99
-} VARIATION_TYPE;
-
-typedef enum {
-  STRUCTURE_VARIATION = 0,
-  STOP_GAIN,
-  STOP_LOSS,
-  START_GAIN,
-  START_LOSS,
-  FRAME_SHIFT,            /* Indel length is not divisible by 3 */
-  CODON_GAIN,             /* Insertion length is divisible by 3 */
-  CODON_LOSS,             /* Deletion length is divisible by 3 */
-  CODON_REGION,           /* Just say the variant is in the Coding Region, used in Structrual Varition*/
-  INSERTION,
-  DELETION,
-  NONSYNONYMOUS,
-  SYNONYMOUS,
-  ESSENTIAL_SPLICE_SITE,
-  NORMAL_SPLICE_SITE,
-  UTR5,
-  UTR3,
-  EXON,
-  INTRON,
-  UPSTREAM,
-  DOWNSTREAM,
-  SNV,                    /*SNV contains the following 6 types, it appears when there is no reference.*/
-  NONCODING,
-  INTERGENIC
-} AnnotationType;
-
-/**
- * A class that provide strings corresponding to above annotation types.
- */
-class OutputAnnotationString{
- public:
-  OutputAnnotationString(){
-    this->setFormat("default");
-  }
-  void setFormat(const char* format) {
-    std::string f = format;
-    f = toLower(f);
-    if ( f == "default" ) {
-      this->annotationString = OutputAnnotationString::defaultAnnotationString;
-    } else if (f == "epact") {
-      this->annotationString = OutputAnnotationString::epactAnnotationString;
-    } else {
-      fprintf(stderr, "Cannot recoginized format: [ %s ]!\n", format);
-    };;
-  };
-  const char* operator [] (const int idx) {
-    return this->annotationString[idx];
-  };
- private:
-  const char** annotationString;
-  static const char* defaultAnnotationString[];
-  static const char* epactAnnotationString[];
-}; // end class OutputAnnotationString
-
-const char* OutputAnnotationString::defaultAnnotationString[] = {
-  "StructuralVariation",
-  "Stop_Gain",
-  "Stop_Loss",
-  "Start_Gain",
-  "Start_Loss",
-  "Frameshift",
-  "CodonGain",
-  "CodonLoss",
-  "CodonRegion",
-  "Insertion",
-  "Deletion",
-  "Nonsynonymous",
-  "Synonymous",
-  "Essential_Splice_Site",
-  "Normal_Splice_Site",
-  "Utr5",
-  "Utr3",
-  "Exon",
-  "Intron",
-  "Upstream",
-  "Downstream",
-  "SNV",
-  "Noncoding",
-  "Intergenic"
-};
-
-const char* OutputAnnotationString::epactAnnotationString[]= {
-  "StructuralVariation",
-  "Nonsense",                 // diff
-  "Stop_Loss",
-  "Start_Gain",
-  "Start_Loss",
-  "Frameshift",
-  "CodonGain",
-  "CodonLoss",
-  "CodonRegion",
-  "Insertion",
-  "Deletion",
-  "Missense",                 // diff
-  "Silent",                   // diff
-  "Essential_Splice_Site",
-  "Normal_Splice_Site",
-  "Utr5",
-  "Utr3",
-  "Exon",
-  "Intron",
-  "Upstream",
-  "Downstream",
-  "SNV",
-  "Noncoding",
-  "Intergenic"
-};
-
 OutputAnnotationString AnnotationString; // global variable
 
-// here we define format or the annotation.
-#define FORWARD_STRAND_STRING "+"
-#define REVERSE_STRAND_STRING "-"
-#define WITHIN_GENE_LEFT_DELIM '('
-#define WITHIN_GENE_RIGHT_DELIM ')'
-#define VCF_ANNOTATION_START_TAG "ANNO="
-#define VCF_ANNOTATION_START_TAG_FULL "ANNOFULL="
-#define VCF_INFO_SEPARATOR ';'
-#define WITHIN_GENE_SEPARATOR ':'
-// #define GENE_SEPARATOR '|'
 
-/**
- * priority are given by lineNo
- * small number -> high priority (more important)
- * contain a relationship between AnnotationType and int(priority)
- */
-struct Priority{
+
+typedef enum {VCF = 0 , PLAIN, PLINK, EPACTS} InputFileFormat;
+
+// hold input file
+// and return (chrom, pos, ref, alt) iteratively
+class AnnotationInputFile{
  public:
-  // Level is just a wrapper for int, we use it only for type checking.
-  struct Level{
-    Level(int i):level(i){};
-    bool operator<(const Priority::Level& l) const{
-      // fprintf(stderr, "called <1: %d, %d \n", this->level, l.level);      
-      return this->level < l.level;
+  AnnotationInputFile(const char* inputFileName, const char* inputFormatStr) {
+    // check inputFormat
+    std::string inputFormat = toLower(inputFormatStr);
+    if (!inputFormat.empty() &&
+        inputFormat != "vcf" &&
+        inputFormat != "plain" &&
+        inputFormat != "plink" &&
+        inputFormat != "epacts") {
+      fprintf(stderr, "Unsupported input format [ %s ], we support VCF, plain, plink and EPACTS formats.\n", inputFormatStr);
+      LOG << "Unsupported input format [ " << inputFormatStr << " ], we support VCF, plain, plink and EPACTS formats.\n";
+      abort();
     };
-    bool operator==(const Priority::Level& l) const{
-      return this->level == l.level;
-    };
-    void dump() {
-      fprintf(stderr, "level = %d\n", this->level);
-    };
-    int level;
-  };     // end struct Level
-  int open(const char* fileName) {
-    // Load priority.txt
-    this->priorityIdx = 0;
-    this->priorityInt2Str.clear();
-    this->priorityStr2Int.clear();
-    LineReader lr(fileName);
-    std::vector<std::string> fd;
 
-    while (lr.readLineBySep(&fd, " \t")){
-      if (fd.size() == 0) continue;
-      if (fd[0][0] == '#') continue;
-      if (fd[0].size() == 0) continue;
-      priorityIdx ++;
-      // fprintf(stderr, "add priority [%s]\n", fd[0].c_str());
-      priorityInt2Str[priorityIdx] = fd[0];
-      priorityStr2Int[fd[0]] = priorityIdx;
-    }
-    return priorityIdx;
-  };
-  Level getPriority(const AnnotationType& t) const{
-    std::map<std::string, int>::const_iterator it;
-    it = this->priorityStr2Int.find( AnnotationString[t] );
-    if (it == this->priorityStr2Int.end()) {
-      fprintf(stderr, "Cannot find annotation type [ %s ] from priority files!\n", AnnotationString[t]);
-      Level l(-1);      
-      return l;
-    } else {
-      Level l(it->second);
-      return l;
-    }
-  };
-
-  std::string getAnnotationString (const int& i) const{
-    std::map<int, std::string>::const_iterator it;
-    it = this->priorityInt2Str.find( i );
-    if (it == this->priorityInt2Str.end()) {
-      fprintf(stderr, "Cannot find priority [ %d ] from priority files!\n", i);
-      return "";
-    } else {
-      return it->second;
-    }
-  };
-  /**
-   * @return the string representation of @param priority
-   */
-  std::string toString(const int priority) const {
-    std::string s;
-    std::map<int, std::string>::const_iterator it;
-    it = this->priorityInt2Str.find(priority);
-    if (it == this->priorityInt2Str.end()) {
-      return s;
+    if (inputFormat == "vcf" || inputFormat.empty()) {
+      // ga.annotateVCF(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
+      this->format = VCF;
+    } else if (inputFormat == "plain") {
+      // ga.annotatePlain(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
+      this->format = PLAIN;
+    } else if (inputFormat == "plink") {
+      // ga.annotatePlink(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
+      this->format = PLINK;
+    } else if (inputFormat == "epacts") {
+      // ga.annotateEpacts(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
+      this->format = EPACTS;
     } else{
-      return it->second;
-    }
-  };
-
-  static int getLeastPriority(){
-    return 9999;
-  }
- private:
-  int priorityIdx;
-  std::map<int, std::string> priorityInt2Str;
-  std::map<std::string, int> priorityStr2Int;
-}; // end Priority
-
-/**
- * For each gene, we use AnnotationResult to store all annotation results.
- */
-class AnnotationResult{
- public:
-  void clear() {
-    this->gene = NULL;
-    this->type.clear();
-    this->detail.clear();
-  };
-
-  void add(const Gene& g){
-    if (this->type.size() != 0) {
-      // we usually record gene name and its strand first
-      fprintf(stderr, "Something weired happen\n");
-    }
-    this->gene = &g;
-  };
-  void add(const AnnotationType& t) {
-    this->type.push_back(t);
-  };
-  // add extra details such as "(CCT/Pro->CAT/His)" to the last element
-  void addDetail(const AnnotationType& t, const std::string& s) {
-    this->detail[t] = s;
-  };
-  void sortByPriority(const Priority& p) {
-    Comparator compareFunction(p);
-    // for (size_t i = 0; i < this->type.size(); ++i) {
-    //   fprintf(stderr, "%zu -> %s ", i, AnnotationString[type[i]]);
-    //   p.getPriority(type[i]).dump();
-    // };
-    // puts("-----");
-    // fprintf(stderr, " sort %d elements: \n", this->type.end() - this->type.begin());
-    std::sort(this->type.begin(), this->type.end(), compareFunction);
-    // for (size_t i = 0; i < this->type.size(); ++i) {
-    //   fprintf(stderr, "%zu -> %s ", i, AnnotationString[type[i]]);
-    //   p.getPriority(type[i]).dump();
-    // };
-    // exit(1);
-  };
-
-  //////////////////////////////////////////////////////////////////////
-  // getters
-  const Gene& getGene() const {
-    return (*this->gene);
-  };
-  const std::string& getGeneName() const{
-    return this->gene->geneName;
-  };
-  const std::string& getTranscriptName() const {
-    return this->gene->transcriptName;
-  };
-  const std::string getFullName() const {
-    return this->gene->geneName + "/" + this->gene->transcriptName;
-  };
-  const size_t getExonNumber() const {
-    return this->gene->getExonNumber();
-  };
-  const std::vector<AnnotationType>& getType() const{
-    return this->type;
-  };
-  const std::map<AnnotationType, std::string>& getDetail() const {
-    return this->detail;
-  };
-  bool hasForwardStrand() const {
-    return this->gene->forwardStrand;
-  };
-  void dump() const { //debugging code
-    printf("[ %s ]", gene->geneName.c_str());
-    for (size_t i = 0; i < type.size(); ++i) {
-      printf(" %s ", AnnotationString[type[i]]);
+      fprintf(stderr, "Cannot recognize input file format: %s \n", inputFileName);
+      abort();
     };
-    puts("");
+
+    // open input files
+    this->lr = new LineReader(inputFileName);
   };
- private:
-  const Gene* gene;
-  std::vector<AnnotationType> type;
-  std::map<AnnotationType, std::string> detail;
-
-  struct Comparator{
-    Comparator(const Priority& p): priority(p) {
-      //fprintf(stderr, "create priority comparator\n");
-    };
-    bool operator() (const AnnotationType& t1,
-                     const AnnotationType& t2) const {
-      // this->priority.getPriority(t1) .dump();
-      // this->priority.getPriority(t2) .dump();
-      // fprintf(stderr, "do comparing\n");
-
-      // const Priority::Level& l1 = this->priority.getPriority(t1);
-      // const Priority::Level& l2 = this->priority.getPriority(t2);
-      // return (l1 < l2 );
-
-      return (this->priority.getPriority(t1)) < (this->priority.getPriority(t2));
-    };
-   private:
-    const Priority& priority;
-  };
-  
-  // int topPriorityIndex;  // this->type[this->topPriorityIndex] has top priority; <0, means unknown, will remove soon
-}; // end AnnotationResult
-
-class AnnotationResultCollection{
- public:
-  AnnotationResultCollection(): sorted(false) {};
-  // STL like accessors
-  void push_back(const AnnotationResult& r) {
-    if (r.getType().size() > 0) {
-      this->data.push_back(r);
-      this->sorted = false;
+  ~AnnotationInputFile() {
+    if (this->lr) {
+      delete lr;
+      this->lr = NULL;
     }
   };
-  AnnotationResult& operator[] (int idx) {
-    return data[idx];
+
+
+  int openReferenceGenome(const char* referenceGenomeFileName) {
+    return this->gs.open(referenceGenomeFileName);
   }
-  const AnnotationResult& operator[] (const int idx) const {
-    return data[idx];
-  }
-  bool empty() const {
-    return this->data.empty();
-  };
-  size_t size() const {
-    return this->data.size();
-  };
-  void clear() {
-    this->data.clear();
-    this->top.clear();
-  };
-  // sort all annoations and calculate top annotations
-  void sortByPriority(const Priority& p) {
-    for (size_t i = 0; i < data.size(); ++i) {
-      data[i].sortByPriority(p);
-    }
-    this->sorted = true;
-    
-    top.clear();
-    if (this->data.size() == 0) return;
-    
-    size_t highestIdx = 0;
-    Priority::Level highestPriority = p.getPriority(this->data[highestIdx].getType()[0]); // [0] is the highest priority
-    this->top.push_back(this->data[0]);    
-    for (size_t i = 1; i != this->data.size(); i++) {
-      Priority::Level newPriority = p.getPriority(this->data[i].getType()[0]);
-      if (newPriority < highestPriority) {
-        highestIdx = i;
-        highestPriority = newPriority;
-        this->top.clear();
-        this->top.push_back(this->data[i]);
-      } else if (newPriority == highestPriority) {
-          this->top.push_back(this->data[i]);
+  // // extract one header line
+  // bool extractHeader(std::string* l) {
+  //   this->line.clear();
+  //   bool ret = this->lr->readByLine(this->line);
+  //   *l = this->line;
+  //   return ret;
+  // };
+  // // extract one header line
+  // bool extractHeader(std::string* l) {
+  //   this->line.clear();
+  //   bool ret = this->lr->readByLine(this->line);
+  //   *l = this->line;
+  //   return ret;
+  // };
+
+  // check ref and alt alleles (may switch ref and alt)
+  //@return true if (1) ref match reference; (2) after switch ref and alt, match reference genome.
+  bool forceReferenceStrand(const std::string& chrom,
+                            const int& pos,
+                            std::string* ref,
+                            std::string* alt) {
+    // determine ref base from reference
+    bool refMatchRef = true;
+    for (size_t i = 0; i < ref->size(); i++ ) {
+      if ((*ref)[i] != gs[chrom][pos - 1 + i]) {
+        refMatchRef = false;
+        break;
       }
     }
-    // sort by exon numbers
-    std::sort(this->top.begin(), this->top.end(), AnnotationResultCollection::CompareAnnotationResultByExonNumberGreater);
-    // for (size_t i = 0; i < this->top.size(); ++i) {
-    //   printf("%zu ", i);
-    //   this->top[i].dump();
-    // }
-    // puts("==========-");
-  };
-  /// remember to call sort by priority before
-  const std::vector<AnnotationResult>& getTopAnnotation() const{
-    assert(sorted);
-    return this->top;
-  };
-  const std::vector<AnnotationResult>& getAllAnnotation() const {
-    return this->data;
-  }
- private:
-  static bool CompareAnnotationResultByExonNumberGreater(const AnnotationResult& r1,
-                                                         const AnnotationResult& r2) {
-    return r1.getExonNumber() > r2.getExonNumber();
-  };
-  std::vector<AnnotationResult> data;
-  std::vector<AnnotationResult> top; // top priority result
-  bool sorted;
-}; // end class AnnotationResultCollection
-
-/**
- * AnnotationOutput links the class AnnotationResult to a string representation
- * It contain a string templates.
- */
-class AnnotationOutput{
- public:
-  AnnotationOutput():
-      topPriorityTemplate("$(TOP_TYPE):$[$(ALL_TOP_GENE) |]"),
-      geneTemplate("$(GENE_NAME):$(GENE_STRAND):$[$(TYPE) :]"),
-      fullTemplate("$[$(GENE_ANNOTATION) |]"),
-      annotationResult(NULL),
-      priority(NULL)
-  {
-  };
-  void setAnnotationResult(const AnnotationResultCollection& r) {
-    this->annotationResult = &r;
-    this->buildKeywordDict();
-  };
-  void setPriority(const Priority& p) {
-    this->priority = &p;
-  };
-  void buildKeywordDict() {
-    // const AnnotationResultCollection& r = *this->annotationResult;
-    if (this->annotationResult->size() == 0) { // intergenic
-      // will handle later in each separate functions.
-      return;
-    };
-    const std::vector<AnnotationResult>& top = this->annotationResult->getTopAnnotation();
-    const std::vector<AnnotationResult>& all = this->annotationResult->getAllAnnotation();
-    
-    std::vector<std::string> res;
-    for (size_t i= 0; i < top.size() ; ++i) {
-      res.push_back(top[i].getGeneName());
-    }
-
-    // only keep unique gene names
-    inplace_make_set(&res);
-
-    topPriorityTemplate.add("TOP_GENE", res.size() ? res[0]: AnnotationString[INTERGENIC]);
-    topPriorityTemplate.add("ALL_TOP_GENE", res);
-    topPriorityTemplate.add("TOP_TYPE", AnnotationString[top[0].getType()[0]]);
-
-    std::vector<std::string> geneTemplate;
-    for (unsigned int i = 0; i != all.size(); i++){
-      geneTemplate.push_back(getGeneAnnotation(all[i]));
-    }
-    fullTemplate.add("GENE_ANNOTATION", geneTemplate);
-  };
-  // Format:
-  //  Most_priority:gene1|gene2
-  std::string getTopPriorityAnnotation() const{
-    if (this->annotationResult->empty()) {
-      return AnnotationString[INTERGENIC];
-    };
-    std::string s;
-    if (this->topPriorityTemplate.translate(&s)) {
-      fprintf(stderr, "topPriorityTemplate failed translation!\n");
-    }
-    return s;
-  };
-
-  std::string getFullAnnotation(){
-    if (this->annotationResult->empty()) {
-      return AnnotationString[INTERGENIC];
-    };
-    std::string s;
-    if (this->fullTemplate.translate(&s)) {
-      fprintf(stderr, "fullTemplate failed translation!\n");
-    }
-    return s;
-  };
-
-  // get per gene annotation
-  std::string getGeneAnnotation(const AnnotationResult& res){
-    const std::vector<AnnotationType>& type = res.getType();
-    const std::map<AnnotationType, std::string>& detail = res.getDetail();
-
-    std::vector<std::string> args;
-    std::string s;
-    for (int i = 0; i < type.size(); i++) {
-      s =  AnnotationString[type[i]];
-      // for synonymous or non-synonymous, we may output details
-      std::map<AnnotationType, std::string>::const_iterator iter;
-      iter = detail.find(type[i]);
-      if (iter != detail.end()) {
-        s += iter->second;
+    if (!refMatchRef) {
+      bool altMatchRef = true;
+      for (size_t i = 0; i < alt->size(); i++ ) {
+        if ( (*alt)[i] != gs[chrom][pos - 1 + i]) {
+          altMatchRef = false;
+          break;
+        }
       }
-      args.push_back(s);
+      if (!altMatchRef) {
+        fprintf(stderr, "Ref [%s] and alt [%s] does not match reference: %s:%d\n", ref->c_str(), alt->c_str(),
+                chrom.c_str(), pos);
+        return false;
+      } else {
+        std::swap(*ref, *alt);
+      }
+    }
+    return true;
+  }
+  void setCheckReference(bool b) {
+    this->checkReference = b;
+  };
+  // if reach end or experience something wrong, will @return false
+  bool extract(std::string* chrom,
+               int* pos,
+               std::string* ref,
+               std::string* alt) {
+    bool ret;
+    do {
+      ret = this->lr->readLine(&this->line);
+      if (ret == false)
+        return ret;
+    } while (this->line.empty());
+
+    // for any line beginning with '#', store headers
+    while (line[0] == '#') {
+      this->header.push_back(line);
+      do {
+        ret = this->lr->readLine(&this->line);
+        if (ret == false)
+          return ret;
+      } while (this->line.empty());
     }
 
-    this->geneTemplate.add("GENE_NAME", res.getFullName());
-    this->geneTemplate.add("GENE_STRAND", res.hasForwardStrand() ? FORWARD_STRAND_STRING : REVERSE_STRAND_STRING);
-    this->geneTemplate.add("TYPE", args);
 
-    this->geneTemplate.translate(&s);
+    stringTokenize(line, "\t ", &fd);
 
-    return s;
+    switch (this->format){
+      case VCF:
+        if (fd.size() < 5) return false;
+        *chrom = fd[0];
+        *pos = toInt(fd[1]);
+        *ref = fd[3];
+        *alt = fd[4];
+        break;
+      case PLAIN:
+        if (fd.size() < 4) return false;
+        *chrom = fd[0];
+        *pos = toInt(fd[1]);
+        *ref = fd[2];
+        *alt = fd[3];
+        break;
+      case PLINK:
+        if (fd.size() < 10) return false;
+        *chrom = fd[0];
+        *pos = toInt(fd[2]);
+        *ref = fd[3];
+        *alt = fd[6];
+
+        if (!forceReferenceStrand(*chrom, *pos, ref, alt))
+          return false;
+        break;
+      case EPACTS:
+        {
+          // e.g.
+          // 20:139681_G/A   266     1       1       0.0018797       NA      NA
+          // find
+          int beg = 0;
+          int sep = fd[0].find(':', beg);
+          *chrom = fd[0].substr(beg, sep - beg);
+
+          beg = sep + 1;
+          sep = fd[0].find('_', beg);
+          *pos = toInt(fd[0].substr(beg, sep - beg));
+
+          beg = sep + 1;
+          sep = fd[0].find('/', beg);
+          *ref = toUpper(fd[0].substr(beg, sep - beg));
+
+          beg = sep + 1;
+          sep = fd[0].find_first_of(" _\t", beg);
+          *alt = toUpper(fd[0].substr(beg, sep - beg));
+
+          epactsPrefixLength = sep;
+          if ( chrom->empty() || *pos <= 0 || ref->empty() || alt->empty()) {
+            fprintf(stderr, "Skip line: %s ...." , fd[0].c_str());
+            LOG << "Skip: " << fd[0];
+            return false;
+          }
+        }
+        break;
+      default:
+        fprintf(stderr, "Unknown format, quitting!\n");
+        abort();
+        break;
+    }// end switch
+
+    // verify reference
+    if (this->checkReference) {
+      std::string refFromGenome = this->gs.getBase(*chrom, *pos, *pos + ref->size());
+      if ((*ref) != refFromGenome) {
+        fprintf(stdout, "ERROR: Reference allele does not match genome reference [ %s:%d %s]\n", chrom->c_str(), *pos, ref->c_str());
+        LOG << "ERRROR: Reference allele [" << ref <<   "]  does not match reference genome [" << refFromGenome << "] at " << *chrom << ":" << *pos << "\n";
+      };
+    }
+    return true;
   };
-
-  int inplace_make_set(std::vector<std::string>* input) {
-    std::vector<std::string>& v = * input;
-    std::sort(v.begin(), v.end());
-    std::vector<std::string>::iterator it;
-    it = std::unique(v.begin(), v.end());
-    v.resize( it - v.begin());
-    return v.size();
+  InputFileFormat getFormat() const {
+    return this->format;
+  };
+  std::string getEpactsPrefix(const std::string& s) const{
+    return s.substr(0, this->epactsPrefixLength);
+  };
+  const std::vector< std::string>& getHeader() const {
+    return this->header;
+  };
+  const std::vector< std::string>& getFields() const {
+    return this->fd;
   };
  private:
-  StringTemplate topPriorityTemplate;
-  StringTemplate geneTemplate;
-  StringTemplate fullTemplate;
-  const AnnotationResultCollection* annotationResult;
-  const Priority* priority;
-}; // end AnnotationOutput
+  bool checkReference;
+  InputFileFormat format;
+  LineReader* lr;
+  std::vector< std::string> fd;
+  std::string line;
+  std::vector< std::string> header;
+  GenomeSequence gs; // check if ref alleles matched reference genome
+  size_t epactsPrefixLength;
+}; // end class AnnotationInputFile
 
-struct GeneAnnotationParam{
-  GeneAnnotationParam():
-      upstreamRange(50),
-      downstreamRange(50),
-      spliceIntoExon(3),
-      spliceIntoIntron(8) {};
-  int upstreamRange;      // upstream def
-  int downstreamRange;    // downstream def
-  int spliceIntoExon;     // essential splice site def
-  int spliceIntoIntron;   // essentail splice site def
-};
-
-class GeneAnnotation{
+class AnnotationOutputFile{
  public:
-  GeneAnnotation():allowMixedVariation(false)
-  {};
-  virtual ~GeneAnnotation() {
+  AnnotationOutputFile(const char* out):headerOutputted(false) {
+    this->fout = fopen(out, "wt");
+    if (!this->fout) {
+      fprintf(stderr, "Cannot open otuput file %s for write.\n", out);
+    };
+  };
+  ~AnnotationOutputFile() {
+    if (this->fout) {
+      fclose(this->fout);
+      this->fout = NULL;
+    }
+  };
+  void linkToInput(const AnnotationInputFile& in) {
+    this->aif =  &in;
+  };
+  void writeHeader() {
+    writeHeader(this->aif->getHeader());
+  };
+  void writeHeader(const std::vector< std::string> & h) {
+    for (size_t i = 0; i < h.size(); ++i) {
+      fputs(h[i].c_str(), this->fout);
+      fputc('\n', this->fout);
+    }
+  }
+  void writeResult(const OrderedMap<std::string, std::string>& res) {
+    //fprintf(stderr, "Need to link output to input!\n");
+    assert(aif);
+
+    if (!this->headerOutputted) {
+      this->writeHeader();
+      this->headerOutputted = true;
+    }
+
+    const std::vector< std::string> & field = aif->getFields();
+    std::string key;
+    std::string val;
+    switch (aif->getFormat()) {
+      case VCF:
+        {
+          for (size_t i = 0; i < field.size(); ++i) {
+            if (i) fputc('\t', fout);
+            fputs(field[i].c_str(), fout) ;
+            if (i == 7) { // 7: the 8th column in 0-based index
+              if (!field[i].empty())
+                fputc(VCF_INFO_SEPARATOR, fout);
+              for (size_t j = 0; j < res.size(); ++j) {
+                if (j)
+                  fputc(VCF_INFO_SEPARATOR, fout);
+                res.at(j, &key, &val);
+                fputs(key.c_str(), this->fout);
+                fputc('=', this->fout);
+                fputs(val.c_str(), this->fout);
+              }
+            }
+          };
+        }
+        break;
+      case PLAIN:
+      case PLINK:
+        {
+          for (size_t i = 0; i < field.size(); ++i) {
+            if (i) fputc('\t', fout);
+            fputs(field[i].c_str(), fout);
+          };
+          for (size_t j = 0; j < res.size(); ++j) {
+            fputc('\t', fout);
+            res.at(j, &key, &val);
+            // fputs(key.c_str(), this->fout);
+            // fputc('=', this->fout);
+            fputs(val.c_str(), this->fout);
+          }
+        }
+        break;
+      case EPACTS:
+        {
+          //fputs(field[0].substr(0, sep).c_str(), fout);
+          fputs(aif->getEpactsPrefix(field[0]).c_str(), fout);
+          fputc('_', fout);
+          std::string s;
+          res.value("ANNO", &s);
+          fputs(s.c_str(), fout);
+
+          for (unsigned int i = 1; i < field.size(); i++ ){
+            fputs("\t", fout);
+            fputs(field[i].c_str(), fout) ;
+          }
+        }
+        break;
+      default:
+        break;
+    };
+    fputc('\n', this->fout);
+  };
+ private:
+  const AnnotationInputFile* aif;
+  FILE* fout;
+  bool headerOutputted;
+}; // class AnnotationOutputFile
+
+// run annotations (gene based, bed file, genomeScores, tabix database)
+// and store results
+class AnnotationController{
+ public:
+  AnnotationController(AnnotationInputFile& in): aif(in){
+  };
+  virtual ~AnnotationController() {
     for (size_t i = 0; i < bedReader.size() ; ++i) {
       delete bedReader[i];
     }
@@ -593,67 +397,7 @@ class GeneAnnotation{
       delete genomeScore[i];
     };
   };
-  void setFormat(const std::string& f) {
-    std::string s = toLower(f);
-    if (s == "refflat") {
-      this->format.setRefFlatFormat();
-      LOG << "Input gene format: refFlat\n";
-    } else if (s == "knowngene") {
-      this->format.setUCSCKnownGeneFormat();
-      LOG << "Input gene format: knownGene\n";      
-    } else if (s == "refgene") {
-      this->format.setRefGeneFormat();
-      LOG << "Input gene format: refGene\n";      
-    } else {
-      fprintf(stderr, "Unknown format (other than refFlat, knownGene, refGene)!\nNow quitting...\n");
-      LOG << "Input gene format is wrong!\n";      
-      abort();
-    }
-  };
-  void openGeneFile(const char* geneFileName){
-    fprintf(stdout, "Load gene file %s...\n", geneFileName);
-    std::string line;
-    std::vector<std::string> fields;
-    LineReader lr(geneFileName);
-    int totalGene = 0;
-    while (lr.readLine(&line) > 0) {
-      stringStrip(&line);
-      if (line.size()>0 && line[0] == '#' || line.size() == 0) continue; // skip headers and empty lines
-      Gene g;
-      g.readLine(line.c_str(), this->format);
-      this->geneList[g.chr].push_back(g);
-      totalGene ++;
-    }
-    // make sure genes are ordered
-    this->sortGene();
-    fprintf(stdout, "DONE: %d gene loaded.\n", totalGene);
-    LOG << "Gene file " << geneFileName << " loads succeed!\n";
-    return;
-  };
-  void openCodonFile(const char* codonFileName) {
-    fprintf(stdout, "Load codon file %s...\n", codonFileName);
-    this->codon.open(codonFileName);
-    fprintf(stdout, "DONE: codon file loaded.\n");
-    LOG << "Codon file " << codonFileName << " loads succeed!\n";
-    return;
-  };
-  void openReferenceGenome(const char* referenceGenomeFileName) {
-    fprintf(stdout, "Load reference genome %s...\n", referenceGenomeFileName);
-    this->gs.open(referenceGenomeFileName);
-    fprintf(stdout, "DONE: %d chromosomes and %ld bases are loaded.\n", this->gs.size(), this->gs.getGenomeLength());
-    LOG << "Reference genome file " << referenceGenomeFileName << " loads succeed!\n";
-    return;
-  };
-  void openPriorityFile(const char* fileName) {
-    fprintf(stdout, "Load priority file %s...\n", fileName);
-    int ret = this->priority.open(fileName);
-    fprintf(stderr, "DONE: %d priority annotation types loaded.\n", ret);
-    LOG << "Priority file " << fileName << " load succeed!\n";
-
-    this->outputter.setPriority(this->priority);
-    return;
-  };
-  void addBedFile(const char* tag, const char* fn) {
+  void openBedFile(const char* tag, const char* fn) {
     // check duplication
     for (size_t i = 0; i < this->bedTag.size(); ++i ) {
       if (this->bedTag[i] == tag) {
@@ -661,7 +405,7 @@ class GeneAnnotation{
         return;
       }
     }
-          
+
     // add bedFile
     BedReader* p = new BedReader;
     int ret = p->open(fn);
@@ -676,7 +420,7 @@ class GeneAnnotation{
     this->bedTag.push_back(tag);
     this->bedReader.push_back(p);
   };
-  void addGenomeScore(const char* tag, const char* fn){
+  void openGenomeScoreFile(const char* tag, const char* fn){
     // check duplication
     for (size_t i = 0; i < this->genomeScoreTag.size(); ++i) {
       if (this->genomeScoreTag[i] == tag ) {
@@ -684,1015 +428,362 @@ class GeneAnnotation{
         return;
       }
     }
-          
+
     // add genome score file
     GenomeScore* p = new GenomeScore(fn);
     this->genomeScoreTag.push_back(tag);
     this->genomeScore.push_back(p);
   };
-  /**
-   * parse input file, and call annotate, and then output results
-   */
-  void annotateVCF(const char* inputFileName, const char* outputFileName){
-    // open output file
-    FILE* fout = fopen(outputFileName, "wt");
-    assert(fout);
 
-    // open input file
-    LineReader lr(inputFileName);
-    std::vector<std::string> field;
-    std::string line;
-    int totalVariants = 0;
-    while(lr.readLine(&line) > 0) {
-      if (line.size() == 0 || line[0] == '#') {
-        fputs(line.c_str(), fout);
-        fputc('\n', fout);
-        continue;
-      }
-      stringTokenize(line, "\t", &field);
-      if (field.size() < 5) continue;
-      totalVariants++;
-      std::string chr = field[0];
-      int pos = toInt(field[1]);
-      std::string ref = toUpper(field[3]);
-      std::string alt = toUpper(field[4]);
+  // /**
+  //  * parse input file, and call annotate, and then output results
+  //  */
+  // void annotateVCF(const char* inputFileName, const char* outputFileName){
+  //   // open output file
+  //   FILE* fout = fopen(outputFileName, "wt");
+  //   assert(fout);
 
-      // real part of annotation
-      annotate(chr, pos, ref, alt, &annotationResults);
-      outputter.setAnnotationResult(annotationResults);
+  //   // open input file
+  //   LineReader lr(inputFileName);
+  //   std::vector<std::string> field;
+  //   std::string line;
+  //   int totalVariants = 0;
+  //   while(lr.readLine(&line) > 0) {
+  //     if (line.size() == 0 || line[0] == '#') {
+  //       fputs(line.c_str(), fout);
+  //       fputc('\n', fout);
+  //       continue;
+  //     }
+  //     stringTokenize(line, "\t", &field);
+  //     if (field.size() < 5) continue;
+  //     totalVariants++;
+  //     std::string chr = field[0];
+  //     int pos = toInt(field[1]);
+  //     std::string ref = toUpper(field[3]);
+  //     std::string alt = toUpper(field[4]);
 
-      // output annotation result
-      // VCF info field is the 8th column
-      std::vector<std::string> bedString;
-      for (unsigned int i = 0; i < field.size(); i++ ){
-        if (i) fputc('\t', fout);
-        fputs(field[i].c_str(), fout) ;
-        if (i == 7) { // 7: the 8th column in 0-based index
-          if (field[i].size() != 0) {
-            fputc(VCF_INFO_SEPARATOR, fout);
-          }
-          fputs(VCF_ANNOTATION_START_TAG, fout);
-          fputs(outputter.getTopPriorityAnnotation().c_str(), fout);
-          fputc(VCF_INFO_SEPARATOR, fout);
-          fputs(VCF_ANNOTATION_START_TAG_FULL, fout);
-          fputs(outputter.getFullAnnotation().c_str(), fout);
-          for (size_t br = 0; br < this->bedReader.size(); ++ br) {
-            if (this->bedReader[br]->find(chr.c_str(), pos, &bedString)){
-              fputs(";", fout);
-              fputs(this->bedTag[br].c_str(), fout);
-              if (!bedString.empty())  {
-                fputs("=", fout);
-                fputs(stringJoin(bedString, ',').c_str(), fout);
-              }
-            }
-          }
-          for (size_t gs = 0; gs < this->genomeScore.size(); ++ gs) {
-            fputs(";", fout);
-            fputs(this->genomeScoreTag[gs].c_str(), fout);
-            fputs("=", fout);
-            fprintf(fout, "%.3f", this->genomeScore[gs]->baseScore(chr.c_str(), pos));
-          }
-        }
-      }
-      fputc('\n', fout);
-    }
-    // close output
-    fclose(fout);
-    fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
-    fprintf(stdout, "DONE: Generated annotation output in [ %s ].\n", outputFileName);
-    LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
+  //     // real part of annotation
+  //     annotate(chr, pos, ref, alt, &annotationResults);
+  //     outputter.setAnnotationResult(annotationResults);
 
-    // output stats
-    this->outputAnnotationStats(outputFileName);
-  } // annotateVCF
-  void annotatePlain(const char* inputFileName, const char* outputFileName){
-    // open output file
-    FILE* fout = fopen(outputFileName, "wt");
-    assert(fout);
+  //     // output annotation result
+  //     // VCF info field is the 8th column
+  //     std::vector<std::string> bedString;
+  //     for (unsigned int i = 0; i < field.size(); i++ ){
+  //       if (i) fputc('\t', fout);
+  //       fputs(field[i].c_str(), fout) ;
+  //       if (i == 7) { // 7: the 8th column in 0-based index
+  //         if (field[i].size() != 0) {
+  //           fputc(VCF_INFO_SEPARATOR, fout);
+  //         }
+  //         fputs(VCF_ANNOTATION_START_TAG, fout);
+  //         fputs(outputter.getTopPriorityAnnotation().c_str(), fout);
+  //         fputc(VCF_INFO_SEPARATOR, fout);
+  //         fputs(VCF_ANNOTATION_START_TAG_FULL, fout);
+  //         fputs(outputter.getFullAnnotation().c_str(), fout);
+  //         for (size_t br = 0; br < this->bedReader.size(); ++ br) {
+  //           if (this->bedReader[br]->find(chr.c_str(), pos, &bedString)){
+  //             fputs(";", fout);
+  //             fputs(this->bedTag[br].c_str(), fout);
+  //             if (!bedString.empty())  {
+  //               fputs("=", fout);
+  //               fputs(stringJoin(bedString, ',').c_str(), fout);
+  //             }
+  //           }
+  //         }
+  //         for (size_t gs = 0; gs < this->genomeScore.size(); ++ gs) {
+  //           fputs(";", fout);
+  //           fputs(this->genomeScoreTag[gs].c_str(), fout);
+  //           fputs("=", fout);
+  //           fprintf(fout, "%.3f", this->genomeScore[gs]->baseScore(chr.c_str(), pos));
+  //         }
+  //       }
+  //     }
+  //     fputc('\n', fout);
+  //   }
+  //   // close output
+  //   fclose(fout);
+  //   fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
+  //   fprintf(stdout, "DONE: Generated annotation output in [ %s ].\n", outputFileName);
+  //   LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
 
-    // open input file
-    LineReader lr(inputFileName);
-    std::vector<std::string> field;
-    std::string line;
-    int totalVariants = 0;
-    while(lr.readLine(&line) > 0) {
-      if (line.size() == 0 || line[0] == '#') {
-        fputs(line.c_str(), fout);
-        fputc('\n', fout);
-        continue;
-      }
-      stringTokenize(line, "\t", &field);
-      if (field.size() < 4) continue;
-      totalVariants++;
-      std::string chr = field[0];
-      int pos = toInt(field[1]);
-      std::string ref = toUpper(field[2]);
-      std::string alt = toUpper(field[3]);
+  //   // output stats
+  //   this->outputAnnotationStats(outputFileName);
+  // } // annotateVCF
+  // void annotatePlain(const char* inputFileName, const char* outputFileName){
+  //   // open output file
+  //   FILE* fout = fopen(outputFileName, "wt");
+  //   assert(fout);
 
-      // real part of annotation
-      annotate(chr, pos, ref, alt, &annotationResults);
-      outputter.setAnnotationResult(annotationResults);
+  //   // open input file
+  //   LineReader lr(inputFileName);
+  //   std::vector<std::string> field;
+  //   std::string line;
+  //   int totalVariants = 0;
+  //   while(lr.readLine(&line) > 0) {
+  //     if (line.size() == 0 || line[0] == '#') {
+  //       fputs(line.c_str(), fout);
+  //       fputc('\n', fout);
+  //       continue;
+  //     }
+  //     stringTokenize(line, "\t", &field);
+  //     if (field.size() < 4) continue;
+  //     totalVariants++;
+  //     std::string chr = field[0];
+  //     int pos = toInt(field[1]);
+  //     std::string ref = toUpper(field[2]);
+  //     std::string alt = toUpper(field[3]);
 
-      // output annotation result
-      // VCF info field is the 8th column
-      std::vector<std::string> bedString;      
-      for (unsigned int i = 0; i < field.size(); i++ ){
-        fputs(field[i].c_str(), fout) ;
-        fputs("\t", fout);
-      }
-      fputs(outputter.getTopPriorityAnnotation().c_str(), fout);
-      fputs("\t", fout);
-      fputs(outputter.getFullAnnotation().c_str(), fout);
+  //     // real part of annotation
+  //     annotate(chr, pos, ref, alt, &annotationResults);
+  //     outputter.setAnnotationResult(annotationResults);
 
-      for (size_t br = 0; br < this->bedReader.size(); ++ br) {
-        if (this->bedReader[br]->find(chr.c_str(), pos, &bedString)){
-          fputs("\t", fout);
-          fputs(this->bedTag[br].c_str(), fout);
-          if (!bedString.empty())  {
-            fputs("=", fout);
-            fputs(stringJoin(bedString, ',').c_str(), fout);
-          }
-        }
-      }
-      for (size_t gs = 0; gs < this->genomeScore.size(); ++ gs) {
-        fputs("\t", fout);
-        fputs(this->genomeScoreTag[gs].c_str(), fout);
-        fputs("=", fout);
-        fprintf(fout, "%.3f", this->genomeScore[gs]->baseScore(chr.c_str(), pos));
-      }
-      fputc('\n', fout);
-    }
-    // close output
-    fclose(fout);
-    fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
-    fprintf(stdout, "DONE: Generated annotation output in [ %s ].\n", outputFileName);
-    LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
+  //     // output annotation result
+  //     // VCF info field is the 8th column
+  //     std::vector<std::string> bedString;
+  //     for (unsigned int i = 0; i < field.size(); i++ ){
+  //       fputs(field[i].c_str(), fout) ;
+  //       fputs("\t", fout);
+  //     }
+  //     fputs(outputter.getTopPriorityAnnotation().c_str(), fout);
+  //     fputs("\t", fout);
+  //     fputs(outputter.getFullAnnotation().c_str(), fout);
 
-    // output stats
-    this->outputAnnotationStats(outputFileName);
-  } // annotatePlain
-  // plink associated results (.assoc files)
-  // NOTE: ref and alt allelel need to get from reference
-  //    1   1:196404269  196404269    A       19        0    G         6.61      0.01014           NA
-  void annotatePlink(const char* inputFileName, const char* outputFileName){
-    // open output file
-    FILE* fout = fopen(outputFileName, "wt");
-    assert(fout);
+  //     for (size_t br = 0; br < this->bedReader.size(); ++ br) {
+  //       if (this->bedReader[br]->find(chr.c_str(), pos, &bedString)){
+  //         fputs("\t", fout);
+  //         fputs(this->bedTag[br].c_str(), fout);
+  //         if (!bedString.empty())  {
+  //           fputs("=", fout);
+  //           fputs(stringJoin(bedString, ',').c_str(), fout);
+  //         }
+  //       }
+  //     }
+  //     for (size_t gs = 0; gs < this->genomeScore.size(); ++ gs) {
+  //       fputs("\t", fout);
+  //       fputs(this->genomeScoreTag[gs].c_str(), fout);
+  //       fputs("=", fout);
+  //       fprintf(fout, "%.3f", this->genomeScore[gs]->baseScore(chr.c_str(), pos));
+  //     }
+  //     fputc('\n', fout);
+  //   }
+  //   // close output
+  //   fclose(fout);
+  //   fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
+  //   fprintf(stdout, "DONE: Generated annotation output in [ %s ].\n", outputFileName);
+  //   LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
 
-    // open input file
-    LineReader lr(inputFileName);
-    std::vector<std::string> field;
-    std::string line;
-    int totalVariants = 0;
-    while(lr.readLine(&line) > 0) {
-      if (line.size() == 0 || line[0] == '#') {
-        fputs(line.c_str(), fout);
-        fputc('\n', fout);
-        continue;
-      }
-      stringNaturalTokenize(line, " ", &field);
-      if (field.size() < 10) continue;
-      totalVariants++;
-      std::string chr = field[0];
-      int pos = toInt(field[2]);
-      std::string ref = toUpper(field[3]);
-      std::string alt = toUpper(field[6]);
+  //   // output stats
+  //   this->outputAnnotationStats(outputFileName);
+  // } // annotatePlain
+  // // plink associated results (.assoc files)
+  // // NOTE: ref and alt allelel need to get from reference
+  // //    1   1:196404269  196404269    A       19        0    G         6.61      0.01014           NA
+  // void annotatePlink(const char* inputFileName, const char* outputFileName){
+  //   // open output file
+  //   FILE* fout = fopen(outputFileName, "wt");
+  //   assert(fout);
 
-      // determine ref base from reference
-      bool refMatchRef = true;
-      for (int i = 0; i < ref.size(); i++ ) {
-        if (ref[i] != gs[chr][pos - 1 + i]) {
-          refMatchRef = false;
-          break;
-        }
-      }
-      if (!refMatchRef) {
-        bool altMatchRef = true;
-        for (int i = 0; i < alt.size(); i++ ) {
-          if (alt[i] != gs[chr][pos - 1 + i]) {
-            altMatchRef = false;
-            break;
-          }
-        }
-        if (!altMatchRef) {
-          fprintf(stderr, "Ref [%s] and alt [%s] does not match reference: %s:%d\n", ref.c_str(), alt.c_str(), chr.c_str(), pos);
-          continue;
+  //   // open input file
+  //   LineReader lr(inputFileName);
+  //   std::vector<std::string> field;
+  //   std::string line;
+  //   int totalVariants = 0;
+  //   while(lr.readLine(&line) > 0) {
+  //     if (line.size() == 0 || line[0] == '#') {
+  //       fputs(line.c_str(), fout);
+  //       fputc('\n', fout);
+  //       continue;
+  //     }
+  //     stringNaturalTokenize(line, " ", &field);
+  //     if (field.size() < 10) continue;
+  //     totalVariants++;
+  //     std::string chr = field[0];
+  //     int pos = toInt(field[2]);
+  //     std::string ref = toUpper(field[3]);
+  //     std::string alt = toUpper(field[6]);
+
+  //     // determine ref base from reference
+  //     bool refMatchRef = true;
+  //     for (int i = 0; i < ref.size(); i++ ) {
+  //       if (ref[i] != gs[chr][pos - 1 + i]) {
+  //         refMatchRef = false;
+  //         break;
+  //       }
+  //     }
+  //     if (!refMatchRef) {
+  //       bool altMatchRef = true;
+  //       for (int i = 0; i < alt.size(); i++ ) {
+  //         if (alt[i] != gs[chr][pos - 1 + i]) {
+  //           altMatchRef = false;
+  //           break;
+  //         }
+  //       }
+  //       if (!altMatchRef) {
+  //         fprintf(stderr, "Ref [%s] and alt [%s] does not match reference: %s:%d\n", ref.c_str(), alt.c_str(), chr.c_str(), pos);
+  //         continue;
+  //       } else {
+  //         std::swap(ref, alt);
+  //       }
+  //     }
+
+  //     // real part of annotation
+  //     annotate(chr, pos, ref, alt, &annotationResults);
+  //     outputter.setAnnotationResult(annotationResults);
+
+  //     // output annotation result
+  //     // VCF info field is the 8th column
+  //     std::vector<std::string> bedString;
+  //     for (unsigned int i = 0; i < field.size(); i++ ){
+  //       fputs(field[i].c_str(), fout) ;
+  //       fputs("\t", fout);
+  //     }
+  //     fputs(outputter.getTopPriorityAnnotation().c_str(), fout);
+  //     fputs("\t", fout);
+  //     fputs(outputter.getFullAnnotation().c_str(), fout);
+
+  //     for (size_t br = 0; br < this->bedReader.size(); ++ br) {
+  //       if (this->bedReader[br]->find(chr.c_str(), pos, &bedString)){
+  //         fputs("\t", fout);
+  //         fputs(this->bedTag[br].c_str(), fout);
+  //         if (!bedString.empty())  {
+  //           fputs("=", fout);
+  //           fputs(stringJoin(bedString, ',').c_str(), fout);
+  //         }
+  //       }
+  //     }
+  //     for (size_t gs = 0; gs < this->genomeScore.size(); ++ gs) {
+  //       fputs("\t", fout);
+  //       fputs(this->genomeScoreTag[gs].c_str(), fout);
+  //       fputs("=", fout);
+  //       fprintf(fout, "%.3f", this->genomeScore[gs]->baseScore(chr.c_str(), pos));
+  //     }
+  //     fputc('\n', fout);
+  //   }
+  //   // close output
+  //   fclose(fout);
+  //   fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
+  //   fprintf(stdout, "DONE: Generated annotation output in [ %s ].\n", outputFileName);
+  //   LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
+
+  //   // output stats
+  //   this->outputAnnotationStats(outputFileName);
+  // } // annotatePlink
+  // // epacts input:
+  // // NOTE: ref and alt allelel need to get from reference
+  // //    1   1:196404269  196404269    A       19        0    G         6.61      0.01014           NA
+  // void annotateEpacts(const char* inputFileName, const char* outputFileName){
+  //   // open output file
+  //   FILE* fout = fopen(outputFileName, "wt");
+  //   assert(fout);
+
+  //   // open input file
+  //   LineReader lr(inputFileName);
+  //   std::vector<std::string> field;
+  //   std::string line;
+  //   int totalVariants = 0;
+  //   while(lr.readLine(&line) > 0) {
+  //     if (line.size() == 0 || line[0] == '#') {
+  //       fputs(line.c_str(), fout);
+  //       fputc('\n', fout);
+  //       continue;
+  //     }
+  //     stringNaturalTokenize(line, " \t", &field);
+  //     if (field.size() < 1) continue;
+  //     totalVariants++;
+
+  //     // find
+  //     int beg = 0;
+  //     int sep = field[0].find(':', beg);
+  //     std::string chr = field[0].substr(beg, sep - beg);
+
+  //     beg = sep + 1;
+  //     sep = field[0].find('_', beg);
+  //     int pos = toInt(field[0].substr(beg, sep - beg));
+
+  //     beg = sep + 1;
+  //     sep = field[0].find('/', beg);
+  //     std::string ref = toUpper(field[0].substr(beg, sep - beg));
+
+  //     beg = sep + 1;
+  //     sep = field[0].find_first_of(" _\t", beg);
+  //     std::string alt = toUpper(field[0].substr(beg, sep - beg));
+
+  //     if (chr == "" || pos <= 0 || ref == "" || alt == "") {
+  //       fprintf(stderr, "Skip line: %s ...." , field[0].c_str());
+  //       LOG << "Skip: " << field[0];
+  //       continue;
+  //     }
+  //     // real part of annotation
+  //     annotate(chr, pos, ref, alt, &annotationResults);
+  //     outputter.setAnnotationResult(annotationResults);
+
+  //     // output annotation result
+  //     fputs(field[0].substr(0, sep).c_str(), fout);
+  //     fputc('_', fout);
+  //     fputs(outputter.getTopPriorityAnnotation().c_str(), fout);
+  //     // fputs("\t", fout);
+  //     // fputs(outputter.getFullAnnotation(annotationResult).c_str(), fout);
+
+  //     for (unsigned int i = 1; i < field.size(); i++ ){
+  //       fputs("\t", fout);
+  //       fputs(field[i].c_str(), fout) ;
+  //     }
+  //     // not output BED or GenomeScore
+  //     fputc('\n', fout);
+  //   }
+  //   // close output
+  //   fclose(fout);
+  //   fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
+  //   fprintf(stdout, "DONE: Generated annotation output in [ %s ].\n", outputFileName);
+  //   LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
+
+  //   // output stats
+  //   this->outputAnnotationStats(outputFileName);
+  // } // annotateEpacts
+
+  void annotate(std::string& chrom,
+                int& pos,
+                std::string& ref,
+                std::string& alt) {
+    this->geneAnnotation.annotate(chrom, pos, ref, alt);
+
+    this->result.clear();
+    this->result["ANNO"] = this->geneAnnotation.getTopPriorityAnnotation();
+    this->result["ANNOFULL"] = this->geneAnnotation.getFullAnnotation();
+
+    std::vector<std::string> bedString;
+    for (size_t br = 0; br < this->bedReader.size(); ++ br) {
+      if (this->bedReader[br]->find(chrom.c_str(), pos, &bedString)){
+        if (!bedString.empty())  {
+          this->result[this->bedTag[br]] = stringJoin(bedString, ',');
         } else {
-          std::swap(ref, alt);
+          this->result[this->bedTag[br]] = "";
         }
       }
-
-      // real part of annotation
-      annotate(chr, pos, ref, alt, &annotationResults);
-      outputter.setAnnotationResult(annotationResults);
-
-      // output annotation result
-      // VCF info field is the 8th column
-      std::vector<std::string> bedString;      
-      for (unsigned int i = 0; i < field.size(); i++ ){
-        fputs(field[i].c_str(), fout) ;
-        fputs("\t", fout);
-      }
-      fputs(outputter.getTopPriorityAnnotation().c_str(), fout);
-      fputs("\t", fout);
-      fputs(outputter.getFullAnnotation().c_str(), fout);
-
-      for (size_t br = 0; br < this->bedReader.size(); ++ br) {
-        if (this->bedReader[br]->find(chr.c_str(), pos, &bedString)){
-          fputs("\t", fout);
-          fputs(this->bedTag[br].c_str(), fout);
-          if (!bedString.empty())  {
-            fputs("=", fout);
-            fputs(stringJoin(bedString, ',').c_str(), fout);
-          }
-        }
-      }
-      for (size_t gs = 0; gs < this->genomeScore.size(); ++ gs) {
-        fputs("\t", fout);
-        fputs(this->genomeScoreTag[gs].c_str(), fout);
-        fputs("=", fout);
-        fprintf(fout, "%.3f", this->genomeScore[gs]->baseScore(chr.c_str(), pos));
-      }
-      fputc('\n', fout);
     }
-    // close output
-    fclose(fout);
-    fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
-    fprintf(stdout, "DONE: Generated annotation output in [ %s ].\n", outputFileName);
-    LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
-
-    // output stats
-    this->outputAnnotationStats(outputFileName);
-  } // annotatePlink
-  // epacts input:
-  // NOTE: ref and alt allelel need to get from reference
-  //    1   1:196404269  196404269    A       19        0    G         6.61      0.01014           NA
-  void annotateEpacts(const char* inputFileName, const char* outputFileName){
-    // open output file
-    FILE* fout = fopen(outputFileName, "wt");
-    assert(fout);
-
-    // open input file
-    LineReader lr(inputFileName);
-    std::vector<std::string> field;
-    std::string line;
-    int totalVariants = 0;
-    while(lr.readLine(&line) > 0) {
-      if (line.size() == 0 || line[0] == '#') {
-        fputs(line.c_str(), fout);
-        fputc('\n', fout);
-        continue;
-      }
-      stringNaturalTokenize(line, " \t", &field);
-      if (field.size() < 1) continue;
-      totalVariants++;
-
-      // find
-      int beg = 0;
-      int sep = field[0].find(':', beg);
-      std::string chr = field[0].substr(beg, sep - beg);
-
-      beg = sep + 1;
-      sep = field[0].find('_', beg);
-      int pos = toInt(field[0].substr(beg, sep - beg));
-
-      beg = sep + 1;
-      sep = field[0].find('/', beg);
-      std::string ref = toUpper(field[0].substr(beg, sep - beg));
-
-      beg = sep + 1;
-      sep = field[0].find_first_of(" _\t", beg);
-      std::string alt = toUpper(field[0].substr(beg, sep - beg));
-
-      if (chr == "" || pos <= 0 || ref == "" || alt == "") {
-        fprintf(stderr, "Skip line: %s ...." , field[0].c_str());
-        LOG << "Skip: " << field[0];
-        continue;
-      }
-      // real part of annotation
-      annotate(chr, pos, ref, alt, &annotationResults);
-      outputter.setAnnotationResult(annotationResults);
-
-      // output annotation result
-      fputs(field[0].substr(0, sep).c_str(), fout);
-      fputc('_', fout);
-      fputs(outputter.getTopPriorityAnnotation().c_str(), fout);
-      // fputs("\t", fout);
-      // fputs(outputter.getFullAnnotation(annotationResult).c_str(), fout);
-
-      for (unsigned int i = 1; i < field.size(); i++ ){
-        fputs("\t", fout);
-        fputs(field[i].c_str(), fout) ;
-      }
-      // not output BED or GenomeScore
-      fputc('\n', fout);
+    for (size_t gs = 0; gs < this->genomeScore.size(); ++ gs) {
+      this->result[this->genomeScoreTag[gs]] = toStr(this->genomeScore[gs]->baseScore(chrom.c_str(), pos));
     }
-    // close output
-    fclose(fout);
-    fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
-    fprintf(stdout, "DONE: Generated annotation output in [ %s ].\n", outputFileName);
-    LOG << "Annotate " << inputFileName << " to " << outputFileName << " succeed!\n";
-
-    // output stats
-    this->outputAnnotationStats(outputFileName);
-  } // annotateEpacts
-  void outputAnnotationStats(const char* outputFileName) {
-    // output frequency files
-    std::string fn = outputFileName;
-
-
-    // output annotation frequency (all types of annotation)
-    std::string ofs = fn+".anno.frq";
-    this->printAnnotationFrequency(ofs.c_str());
-    fprintf(stdout, "DONE: Generated frequency of each annotype type in [ %s ].\n", ofs.c_str());
-    LOG << "Generate frequency of each annotation type in " << ofs << " succeed!\n";
-
-    // output annotation frequency
-    ofs = fn+".top.anno.frq";
-    this->printTopPriorityAnnotationFrequency(ofs.c_str());
-    fprintf(stdout, "DONE: Generated frequency of each highest priority annotation type in [ %s ].\n", ofs.c_str());
-    LOG << "Generate frequency of high priority for highest priority annotation type in " << ofs << " succeed!\n";
-
-    // output base change frequency
-    ofs = fn+".base.frq";
-    this->printBaseChangeFrequency(ofs.c_str());
-    fprintf(stdout, "DONE: Generated frequency of each base change in [ %s ].\n", ofs.c_str());
-    LOG << "Generate frequency of each base change in " << ofs << " succeed!\n";
-
-    // output codon change frequency
-    ofs = fn+".codon.frq";
-    this->printCodonChangeFrequency(ofs.c_str());
-    fprintf(stdout, "DONE: Generated frequency of each codon change in [ %s ].\n", ofs.c_str());
-    LOG << "Generate frequency of each codon change in " << ofs << " succeed!\n";
-
-    // output indel length frequency
-    ofs = fn+".indel.frq";
-    this->printIndelLengthFrequency(ofs.c_str());
-    fprintf(stdout, "DONE: Generated frequency of indel length in [ %s ].\n", ofs.c_str());
-    LOG << "Generate frequency of indel length in " << ofs << " succeed!\n";
   };
-  // annotation will find all overlapping gene, and call annotateByGene for each gene
-  // results will be stored in @param annotationResult
-  // priority will also be calculated in annotationResult
-  void annotate(const std::string& chrom,
-                const int pos,
-                const std::string& ref,
-                const std::string& altParam,
-                AnnotationResultCollection* annotationResult) {
-    // check VARATION_TYPE
-    std::string alt = altParam;
-    VARIATION_TYPE type = determineVariationType(ref, alt);
-    if (type == MIXED) {
-      // only annotate the first variation
-      int commaPos = alt.find(',');
-      alt = altParam.substr(0, commaPos);
-      type = determineVariationType(ref, alt);
-    }
-    // verify reference
-    if (this->checkReference) {
-      std::string refFromGenome = this->gs.getBase(chrom, pos, pos + ref.size());
-      if (ref != refFromGenome) {
-        fprintf(stdout, "ERROR: Reference allele does not match genome reference [ %s:%d %s]\n", chrom.c_str(), pos, ref.c_str());
-        LOG << "ERRROR: Reference allele [" << ref <<   "]  does not match reference genome [" << refFromGenome << "] at " << chrom << ":" << pos << "\n";
-      };
-    }
-    // find near target genes
-    std::vector<unsigned> potentialGeneIdx;
-    this->findInRangeGene(chrom, pos, &potentialGeneIdx);
-    // if Intergenic,  we will have (potentialGeneIdx.size() == 0)
 
-    this->annotationResults.clear();
-    AnnotationResult annotationPerGene;
-    // annotate for each gene
-    for (unsigned int i = 0; i < potentialGeneIdx.size(); i++) {
-      annotationPerGene.clear();
-      this->annotateByGene(potentialGeneIdx[i], chrom, pos, ref, alt, type, &annotationPerGene);
-      // annotationPerGene.dump();
-      this->annotationResults.push_back(annotationPerGene);
-    }
-    annotationResults.sortByPriority(this->priority);
-    
-    // record frquency info
-    updateTypeFrequency(type, ref, alt);
-    updateAnnotationFrequency(annotationResults);
-    return;
-  };
-  void updateTypeFrequency(const VARIATION_TYPE& type, const std::string& ref, const std::string& alt) {
-    switch (type) {
-      case SNP:
-        this->baseFreq.add(ref + "->" +alt);
-        break;
-      case INS:
-      case DEL:
-        this->indelLengthFreq.add(calculateIndelLength(ref, alt));
-      default:
-        break;
-    }
+  const OrderedMap<std::string, std::string>& getResult() const {
+    return this->result;
   }
-  void updateAnnotationFrequency(const AnnotationResultCollection& result) {
-    if (!result.size()) { // intergenic
-      this->annotationTypeFreq.add(INTERGENIC);
-      this->topPriorityAnnotationTypeFreq.add(INTERGENIC);
-    } else {
-      const std::vector<AnnotationResult>& top = result.getTopAnnotation();
-      this->topPriorityAnnotationTypeFreq.add(top[0].getType()[0]);
-      
-      const std::vector<AnnotationResult>& all = result.getAllAnnotation();
-      for (size_t i = 0; i < all.size(); ++i ){
-        size_t n = all[i].getType().size();
-        for (size_t j = 0; j < n; j++ ){
-          this->annotationTypeFreq.add( all[i].getType() [j] );
-        }
-      }
-    }
-  };
-  void setAnnotationParameter(GeneAnnotationParam& param) {
-    this->param = param;
-  };
-  void printAnnotationFrequency(const char* fileName){
-    FILE* fp = fopen(fileName, "wt");
-    assert(fp);
-    unsigned int n = this->annotationTypeFreq.size();
-    for (unsigned int i = 0; i < n; i++){
-      AnnotationType t;
-      int freq;
-      this->annotationTypeFreq.at(i, &t, &freq);
-      fprintf(fp, "%s\t%d\n", AnnotationString[t], freq);
-    }
-    fclose(fp);
-  };
-  void printTopPriorityAnnotationFrequency(const char* fileName){
-    FILE* fp = fopen(fileName, "wt");
-    assert(fp);
-    unsigned int n = this->topPriorityAnnotationTypeFreq.size();
-    for (unsigned int i = 0; i < n; i++){
-      AnnotationType t;
-      int freq;
-      this->topPriorityAnnotationTypeFreq.at(i, &t, &freq);
-      fprintf(fp, "%s\t%d\n", AnnotationString[t], freq);
-    }
-    fclose(fp);
-  };
-
-  void printBaseChangeFrequency(const char* fileName){
-    FILE* fp = fopen(fileName, "wt");
-    assert(fp);
-    unsigned int n = this->baseFreq.size();
-    for (unsigned int i = 0; i < n; i++){
-      std::string k;
-      int freq;
-      this->baseFreq.at(i, &k, &freq);
-      fprintf(fp, "%s\t%d\n", k.c_str(), freq);
-    }
-    fclose(fp);
-  };
-  void printCodonChangeFrequency(const char* fileName){
-    FILE* fp = fopen(fileName, "wt");
-    assert(fp);
-    unsigned int n = this->codonFreq.size();
-    for (unsigned int i = 0; i < n; i++){
-      std::string k;
-      int freq;
-      this->codonFreq.at(i, &k, &freq);
-      fprintf(fp, "%s\t%d\n", k.c_str(), freq);
-    }
-    fclose(fp);
-  };
-  void printIndelLengthFrequency(const char* fileName){
-    FILE* fp = fopen(fileName, "wt");
-    assert(fp);
-    unsigned int n = this->indelLengthFreq.size();
-    for (unsigned int i = 0; i < n; i++){
-      int key;
-      int freq;
-      this->indelLengthFreq.at(i, &key, &freq);
-      fprintf(fp, "%d\t%d\n", key, freq);
-    }
-    fclose(fp);
-  };
-  void setCheckReference(bool b) {
-    this->checkReference = b;
-  };
+ public:
+  AnnotationInputFile& aif;
+  // various annotation types
+  GeneAnnotation geneAnnotation;
  private:
-  // make sure genes are ordered
-  void sortGene() {
-    std::map<std::string, std::vector<Gene> >:: iterator it;
-    for (it = this->geneList.begin(); it != this->geneList.end(); it ++){
-      std::sort( it->second.begin(), it->second.end(), GeneCompareLess);
-    }
-  };
-  // store results in @param potentialGeneIdx
-  // find gene whose range plus downstream/upstream overlaps chr:pos
-  void findInRangeGene(const std::string& chr, const int pos, std::vector<unsigned int>* potentialGeneIdx) {
-    assert(potentialGeneIdx);
-    potentialGeneIdx->clear();
-
-    std::vector<Gene>& g = this->geneList[chr];
-    unsigned int gLen = g.size();
-    if (gLen == 0) {
-      return;
-    }
-    int maxDist = (param.upstreamRange > param.downstreamRange) ? param.upstreamRange : param.downstreamRange;
-    Range r ((pos - maxDist), (pos + maxDist));
-    for (unsigned int i = 0; i < gLen; i++ ){
-      if (g[i].tx.start <= r.start) {
-        if (g[i].tx.end < r.start){
-          continue;
-        } else
-          potentialGeneIdx->push_back(i);
-      } else if (r.isInRange(g[i].tx.start)) {
-        potentialGeneIdx->push_back(i);
-      } else {
-        break;
-      }
-    }
-#if 0
-    for (unsigned int i = 0 ; i < potentialGeneIdx->size() ; i++){
-      printf("%d, ", (*potentialGeneIdx)[i]);
-    }
-    printf("\n");
-#endif
-    return;
-  };
-  /**
-   * fill the actual base in @param refTriplet and @param altTriplet
-   * we consider @param forwardStrand, so for forward strand, we copy from this->reference,
-   * or, we copy the reverse complement from this->reference
-   */
-  void fillTriplet(const std::string& chr, const int variantPos, const int codonPos[3], bool forwardStrand,
-                   const std::string& ref, const std::string& alt,
-                   char refTriplet[3], char altTriplet[3]) {
-    assert(ref.size() == 1 && alt.size() == 1);
-    const Chromosome& seq = this->gs[chr];
-    if (codonPos[0] < 0 || codonPos[2] > seq.size()) {
-      refTriplet[0] = refTriplet[1] = refTriplet[2] = 'N';
-      altTriplet[0] = altTriplet[1] = altTriplet[2] = 'N';
-    } else {
-      refTriplet[0] = seq[codonPos[0] - 1];
-      refTriplet[1] = seq[codonPos[1] - 1];
-      refTriplet[2] = seq[codonPos[2] - 1];
-      altTriplet[0] = (variantPos != codonPos[0]) ? seq[codonPos[0] - 1] : alt[0];
-      altTriplet[1] = (variantPos != codonPos[1]) ? seq[codonPos[1] - 1] : alt[0];
-      altTriplet[2] = (variantPos != codonPos[2]) ? seq[codonPos[2] - 1] : alt[0];
-    }
-  };
-  AnnotationType determineSNVType(const std::string& refAAName, const std::string& altAAName, const int codonNum){
-    if (refAAName == Codon::unknownAA || altAAName == Codon::unknownAA) {
-      return SNV;
-    } else if (Codon::isStopCodon(refAAName) && !Codon::isStopCodon(altAAName)) {
-      return STOP_LOSS;
-    } else if (!Codon::isStopCodon(refAAName) && Codon::isStopCodon(altAAName)) {
-      return STOP_GAIN;
-    } else if (refAAName == "Met" && altAAName != "Met" && codonNum <= 3) {
-      return START_LOSS;
-    } else if (refAAName != "Met" && altAAName == "Met" && codonNum <= 3) {
-      return START_GAIN;
-    } else if (refAAName == altAAName) {
-      return SYNONYMOUS;
-    } else {
-      return NONSYNONYMOUS;
-    }
-  };
-  /**
-   * To annotate for insertion is very similar to annotate SNP, and the only difference is that
-   * insertion in the exon could cause frameshift/codon_insertion/codon_deletion
-   */
-  void annotateIns(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt, AnnotationResult* result) {
-    Gene& g = this->geneList[chr][geneIdx];
-    result->add(g);
-
-    // might useful vars.
-    int dist2Gene;
-    int utrPos, utrLen;
-    int exonNum; // which exon
-    int codonNum; // which codon
-    int codonPos[3] = {0, 0, 0}; // the codon position
-    AnnotationType type; // could be one of
-    int intronNum; // which intron
-    bool isEssentialSpliceSite;
-
-    result->add(INSERTION);
-    if (g.isUpstream(variantPos, param.upstreamRange, &dist2Gene)) {
-      result->add(UPSTREAM);
-    } else if (g.isDownstream(variantPos, param.upstreamRange, &dist2Gene)) {
-      result->add(DOWNSTREAM);
-    } else if (g.isExon(variantPos, &exonNum)){//, &codonNum, codonPos)) {
-      result->add(EXON);
-      if (g.isCoding()) {
-        if (g.is5PrimeUtr(variantPos, &utrPos, &utrLen)) {
-          result->add(UTR5);
-        } else if (g.is3PrimeUtr(variantPos, &utrPos, &utrLen)) {
-          result->add(UTR3);
-        } else { // cds part has base change
-          int insertSize = alt.size() - ref.size();
-          if (insertSize % 3 == 0) {
-            result->add(CODON_GAIN);
-            std::string s;
-            char triplet[3];
-            std::string aaName;
-            s+= WITHIN_GENE_LEFT_DELIM;
-            for (unsigned int i = ref.size(); i < alt.size();){
-              triplet[0 ] = alt[i++];
-              triplet[1] = alt[i++];
-              triplet[2] = alt[i++];
-              if (!g.forwardStrand)
-                reverseComplementTriplet(triplet);
-              aaName = this->codon.toAA(triplet);
-              s+= aaName;
-            }
-            s+= WITHIN_GENE_RIGHT_DELIM;
-            result->addDetail(CODON_GAIN, s);
-          } else {
-            result->add(FRAME_SHIFT);
-          }
-        }
-      } else {
-        result->add(NONCODING);
-      }
-      // check splice site
-      if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
-        if (isEssentialSpliceSite)
-          result->add(ESSENTIAL_SPLICE_SITE);
-        else
-          result->add(NORMAL_SPLICE_SITE);
-      }
-    } else if (g.isIntron(variantPos, &intronNum)) {
-      result->add(INTRON);
-      // check splice site
-      if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
-        if (isEssentialSpliceSite)
-          result->add(ESSENTIAL_SPLICE_SITE);
-        else
-          result->add(NORMAL_SPLICE_SITE);
-      }
-    } else {
-      //annotation.push_back("Intergenic");
-    }
-  } // end annotateIns(...)
-  /**
-   * Deletion may across various regions
-   * we use std::set to store all regions it came across
-   *
-   */
-  void annotateDel(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt, AnnotationResult* result) {
-    Gene& g = this->geneList[chr][geneIdx];
-    std::set<AnnotationType> annotationSet;
-
-    // preprocessing alt.
-    std::string cleanedAlt;
-    if (alt == ".") {
-      cleanedAlt = "";
-    } else {
-      cleanedAlt = alt;
-    }
-
-    // might useful vars.
-    int dist2Gene;
-    int utrPos, utrLen;
-    int exonNum; // which exon
-    int codonNum; // which codon
-    int codonPos[3] = {0, 0, 0}; // the codon position
-    AnnotationType type; // could be one of
-    int intronNum; // which intron
-    bool isEssentialSpliceSite;
-
-    // calculate range of the deletion
-    // some cases:
-    // e.g. ref = AG cleanedAlt = A
-    // e.g. ref = AG cleanedAlt = ""
-    int delBeg = variantPos + cleanedAlt.size();  // delBeg: inclusive
-    int delEnd = variantPos + ref.size(); // delEnd: exclusive
-
-    std::string overlappedCdsBase; // bases in the cds (if any)
-    annotationSet.insert(DELETION);
-    for (int pos = delBeg; pos < delEnd; pos++) {
-      if (g.isUpstream(pos, param.upstreamRange, &dist2Gene)) {
-        annotationSet.insert(UPSTREAM);
-      } else if (g.isDownstream(pos, param.upstreamRange, &dist2Gene)) {
-        annotationSet.insert(DOWNSTREAM);
-      } else if (g.isExon(pos, &exonNum)){//, &codonNum, codonPos)) {
-        annotationSet.insert(EXON);
-        if (!g.isNonCoding()) {
-          if (g.is5PrimeUtr(pos, &utrPos, &utrLen)) {
-            annotationSet.insert(UTR5);
-          } else if (g.is3PrimeUtr(pos, &utrPos, &utrLen)) {
-            annotationSet.insert(UTR3);
-          } else { // cds part has base change
-            overlappedCdsBase.push_back(ref[ pos - delBeg ]);
-          }
-        } else {
-          annotationSet.insert(NONCODING);
-        }
-        // check splice site
-        if (g.isSpliceSite(pos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
-          if (isEssentialSpliceSite)
-            annotationSet.insert(ESSENTIAL_SPLICE_SITE);
-          else
-            annotationSet.insert(NORMAL_SPLICE_SITE);
-        }
-      } else if (g.isIntron(pos, &intronNum)) {
-        annotationSet.insert(INTRON);
-        // check splice site
-        if (g.isSpliceSite(pos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
-          if (isEssentialSpliceSite)
-            annotationSet.insert(ESSENTIAL_SPLICE_SITE);
-          else
-            annotationSet.insert(NORMAL_SPLICE_SITE);
-        }
-      } else {
-        //annotation.push_back("Intergenic");
-      }
-    } // end for
-    // check how many codon in cds are delete
-    if (overlappedCdsBase.size() > 0) {
-      if (overlappedCdsBase.size() % 3 == 0) {
-        annotationSet.insert(CODON_LOSS);
-      } else {
-        annotationSet.insert(FRAME_SHIFT);
-      }
-    }
-    // store all existing annotation
-    result->add(g);
-    for (std::set<AnnotationType>::const_iterator it = annotationSet.begin();
-         it != annotationSet.end();
-         it++) {
-      result->add(*it);
-    };
-  }; // end annotateDel
-  /**
-   * SV is the most complex scenario. fully support this is an ongoing work.
-   * We will just annotation the region in the rough scale.
-   */
-  void annotateSV(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt, AnnotationResult* result) {
-    Gene& g = this->geneList[chr][geneIdx];
-    result->add(g);
-
-    // might useful vars.
-    int dist2Gene;
-    int utrPos, utrLen;
-    int exonNum; // which exon
-    int codonNum; // which codon
-    int codonPos[3] = {0, 0, 0}; // the codon position
-    AnnotationType type; // could be one of
-    int intronNum; // which intron
-    bool isEssentialSpliceSite;
-    result->add(STRUCTURE_VARIATION);
-    if (g.isUpstream(variantPos, param.upstreamRange, &dist2Gene)) {
-      result->add(UPSTREAM);
-    } else if (g.isDownstream(variantPos, param.upstreamRange, &dist2Gene)) {
-      result->add(DOWNSTREAM);
-    } else if (g.isExon(variantPos, &exonNum)){//, &codonNum, codonPos)) {
-      result->add(EXON);
-      if (!g.isNonCoding()) {
-        if (g.is5PrimeUtr(variantPos, &utrPos, &utrLen)) {
-          result->add(UTR5);
-        } else if (g.is3PrimeUtr(variantPos, &utrPos, &utrLen)) {
-          result->add(UTR3);
-        } else { // cds part has base change
-          result->add(CODON_REGION);
-        }
-      } else{
-        result->add(NONCODING);
-      }
-      // check splice site
-      if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
-        if (isEssentialSpliceSite)
-          result->add(ESSENTIAL_SPLICE_SITE);
-        else
-          result->add(NORMAL_SPLICE_SITE);
-      }
-    } else if (g.isIntron(variantPos, &intronNum)) {
-      result->add(INTRON);
-      // check splice site
-      if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
-        if (isEssentialSpliceSite)
-          result->add(ESSENTIAL_SPLICE_SITE);
-        else
-          result->add(NORMAL_SPLICE_SITE);
-      }
-    } else {
-      //annotation.push_back("Intergenic");
-    }
-  } // end annotateSV
-  void annotateSNP(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt, AnnotationResult* result) {
-    Gene& g = this->geneList[chr][geneIdx];
-    result->add(g);
-
-    // might useful vars.
-    int dist2Gene;
-    int utrPos, utrLen;
-    int exonNum; // which exon
-    int codonNum; // which codon
-    int codonPos[3] = {0, 0, 0}; // the codon position
-    AnnotationType type; // could be one of
-    int intronNum; // which intron
-    bool isEssentialSpliceSite;
-
-    if (g.isUpstream(variantPos, param.upstreamRange, &dist2Gene)) {
-      result->add(UPSTREAM);
-    } else if (g.isDownstream(variantPos, param.upstreamRange, &dist2Gene)) {
-      result->add(DOWNSTREAM);
-    } else if (g.isExon(variantPos, &exonNum)){//, &codonNum, codonPos)) {
-      result->add(EXON);
-      if (g.isCoding()) {
-        if (g.is5PrimeUtr(variantPos, &utrPos, &utrLen)) {
-          result->add(UTR5);
-        } else if (g.is3PrimeUtr(variantPos, &utrPos, &utrLen)) {
-          result->add(UTR3);
-        } else { // cds part has base change
-          if (g.calculateCodonPosition(variantPos, &codonNum, codonPos)) {
-            char refTriplet[3];
-            char altTriplet[3];
-            std::string refAAName;
-            std::string altAAName;
-            std::string refLetterName;
-            std::string altLetterName;
-            AnnotationType annotationType;
-            // when reference genome is provided
-            if (this->gs.size() >0){
-              this->fillTriplet(chr, variantPos, codonPos, g.forwardStrand, ref, alt, refTriplet, altTriplet);
-              if (!g.forwardStrand){
-                complementTriplet(refTriplet);
-                complementTriplet(altTriplet);
-              };
-              refAAName = this->codon.toAA(refTriplet);
-              altAAName = this->codon.toAA(altTriplet);
-              refLetterName = this->codon.toLetter(refTriplet);
-              altLetterName = this->codon.toLetter(altTriplet);
-              annotationType = this->determineSNVType(refAAName, altAAName, codonNum);
-
-              result->add(annotationType);
-              std::string s;
-              s += WITHIN_GENE_LEFT_DELIM;
-              s += refTriplet[0];
-              s += refTriplet[1];
-              s += refTriplet[2];
-              s += "/";
-              s += refAAName;
-              s += "/";
-              s += refLetterName;
-              s += "->";
-              s += altTriplet[0];
-              s += altTriplet[1];
-              s += altTriplet[2];
-              s += "/";
-              s += altAAName;
-              s += "/";
-              s += altLetterName;
-              s += WITHIN_GENE_SEPARATOR;
-              // quick patch about codon number
-              char buf[128];
-              sprintf(buf, "Base%d/%d",
-                      codonNum + 1, g.getCDSLength());
-              s += buf;
-              s += WITHIN_GENE_SEPARATOR;
-              s += "Codon";
-              s += toStr( codonNum / 3 + 1 );
-              s += "/";
-              s += toStr(g.getCDSLength() / 3);
-              s += WITHIN_GENE_SEPARATOR;
-              s += "Exon";
-              s += toStr(exonNum + 1); // convert 0 indexed to 1 indexed
-              s += "/";
-              s += toStr( (int)( g.exon.size()));
-              s += WITHIN_GENE_RIGHT_DELIM;
-              result->addDetail(annotationType, s);
-              // record frequency
-              this->codonFreq.add(refAAName+"->"+altAAName);
-            } else {
-              result->add(SNV);
-            }
-          } else {
-            result->add(SNV);
-          }
-        }
-      } else{
-        result->add(NONCODING);
-      }
-      // check splice site
-      if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
-        if (isEssentialSpliceSite)
-          result->add(ESSENTIAL_SPLICE_SITE);
-        else
-          result->add(NORMAL_SPLICE_SITE);
-      }
-    } else if (g.isIntron(variantPos, &intronNum)) {
-      result->add(INTRON);
-      // check splice site
-      if (g.isSpliceSite(variantPos, param.spliceIntoExon, param.spliceIntoIntron, &isEssentialSpliceSite)){
-        if (isEssentialSpliceSite)
-          result->add(ESSENTIAL_SPLICE_SITE);
-        else
-          result->add(NORMAL_SPLICE_SITE);
-      }
-    } else {
-      //annotation.push_back("Intergenic");
-    }
-  } // end annotateSNP
-  /**
-   * annotation results will be store in @param result
-   */
-  void annotateByGene(int geneIdx, const std::string& chr, const int& variantPos, const std::string& ref, const std::string& alt,
-                      const VARIATION_TYPE& type,
-                      AnnotationResult* result){
-    result->clear();
-    switch(type) {
-      case SNP:
-        this->annotateSNP(geneIdx, chr, variantPos, ref, alt, result);
-        break;
-      case INS:
-        this->annotateIns(geneIdx, chr, variantPos, ref, alt, result);
-        break;
-      case DEL:
-        this->annotateDel(geneIdx, chr, variantPos, ref, alt, result);
-        break;
-      case SV:
-        this->annotateSV(geneIdx, chr, variantPos, ref, alt, result);
-        break;
-      case MIXED:
-      case UNKNOWN:
-      default:
-        LOG << "Currently we don't support this variation type: " << type << "\n";
-        break;
-    };
-    
-    return;
-  };
-  /**
-   * @return indel length, for insertion, return positive number; or return negative number
-   */
-  int calculateIndelLength(const std::string& ref, const std::string& alt){
-    int refLen = ref.size();
-    int altLen = alt.size();
-    if (alt == "." || alt == "<DEL>") {
-      altLen = 0 ;
-    }
-    return (altLen - refLen);
-  };
-  /**
-   * @return the variation type depending on the first entry in the alt field
-   */
-  VARIATION_TYPE determineVariationType(const std::string& ref, const std::string& alt) {
-    if (alt.find(',') != std::string::npos) {
-      return MIXED;
-    }
-    // NOTE: a single "." is used for deletion; but "G." can represent uncertain breakpoint
-    //       we will check the former case first.
-    if (alt == ".") {
-      return DEL;
-    }
-
-    const char* ALLOWED_BASE = "ACGT";
-    unsigned int refLen = ref.size();
-    unsigned int altLen = alt.size();
-    if (alt.find_first_not_of(ALLOWED_BASE) != std::string::npos) {
-      // NOTE: SV usually contain "[" or "]" for rearrangment
-      //       ">", "<" for haplotypes or large deletion/insertion.
-      return SV;
-    }
-    if (refLen == altLen) {
-      if (refLen == 1){
-        return SNP;
-      } else {
-        return UNKNOWN;
-      }
-    } else if (refLen > altLen) {
-      return DEL;
-    } else if (refLen < altLen) {
-      return INS;
-    }
-    return UNKNOWN;
-  };
- private:
-  // internal data
-  std::map <std::string, std::vector<Gene> > geneList;   // chrom -> genes
-  std::string annotation;
-
+  // various annotation types
   std::vector<BedReader*> bedReader;
   std::vector<std::string> bedTag;
   std::vector<GenomeScore*> genomeScore;
   std::vector<std::string> genomeScoreTag;
-  
-  // parameters 
-  GeneAnnotationParam param;
-  GenomeSequence gs;
-  Codon codon;
-  Priority priority;
-  GeneFormat format;
-  bool checkReference;
-  bool allowMixedVariation;       // VCF ALT field may have more than one variation e..g A,C
 
-  // output related variables
-  AnnotationResultCollection annotationResults;
-  AnnotationOutput outputter;               // control output format
+  OrderedMap<std::string, std::string> result; // store all types of annotation results
+};
 
-  // frequency related variables
-  FreqTable<AnnotationType> annotationTypeFreq;                 // base change frequency
-  FreqTable<AnnotationType> topPriorityAnnotationTypeFreq;      // base change frequency of top priority
-  FreqTable<std::string> baseFreq;                              // base change frequency
-  FreqTable<std::string> codonFreq;                             // codon change frequency
-  FreqTable<int> indelLengthFreq;                               // for insertion, the value is positive; for deletion, positive
-}; // end class GeneAnnotation
 
 int main(int argc, char *argv[])
 {
@@ -1715,7 +806,7 @@ int main(int argc, char *argv[])
       ADD_INT_PARAMETER(pl, spliceIntoExon, "--se", "Specify splice into extron range (default: 3)")
       ADD_INT_PARAMETER(pl, spliceIntoIntron, "--si", "Specify splice into intron range (default: 8)")
       ADD_STRING_PARAMETER(pl, outputFormat, "--outputFormat", "Specify predefined annotation words (default or epact)")
-      ADD_PARAMETER_GROUP(pl, "Additional Functions")      
+      ADD_PARAMETER_GROUP(pl, "Additional Functions")
       ADD_STRING_PARAMETER(pl, genomeScore, "--genomeScore", "Specify the folder of genome score (e.g. GERP=dirGerp/,SIFT=dirSift/)")
       ADD_STRING_PARAMETER(pl, bedFile, "--bed", "Specify the bed file and tag (e.g. ONTARGET1=a1.bed,ONTARGET2=a2.bed)")
       END_PARAMETER_LIST(pl)
@@ -1753,9 +844,7 @@ int main(int argc, char *argv[])
   LOG_START_TIME;
   LOG_PARAMETER(pl);
 
-  GeneAnnotation ga;
   pl.Status();
-  ga.setAnnotationParameter(param);
 
   if (FLAG_priorityFile.empty()) {
     fprintf(stderr, "Use default priority file: /net/fantasia/home/zhanxw/anno/priority.txt\n");
@@ -1769,12 +858,29 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Use default codon file: /net/fantasia/home/zhanxw/anno/codon.txt\n");
     FLAG_referenceFile = "/data/local/ref/karma.ref/human.g1k.v37.fa";
   }
+
   if (!FLAG_outputFormat.empty()) {
     AnnotationString.setFormat(FLAG_outputFormat.c_str());
   }
   else {
-    AnnotationString.setFormat("default");    
+    AnnotationString.setFormat("default");
   };
+
+
+  AnnotationInputFile aif(FLAG_inputFile.c_str(), FLAG_inputFormat.c_str());
+  aif.openReferenceGenome(FLAG_referenceFile.c_str());
+  aif.setCheckReference(FLAG_checkReference);
+
+  AnnotationController controller(aif);
+
+
+  controller.geneAnnotation.setAnnotationParameter(param);
+  controller.geneAnnotation.openReferenceGenome(FLAG_referenceFile.c_str());
+  controller.geneAnnotation.openCodonFile(FLAG_codonFile.c_str());
+  controller.geneAnnotation.openPriorityFile(FLAG_priorityFile.c_str());
+  // controller.geneAnnotation.setFormat(FLAG_geneFileFormat);
+  controller.geneAnnotation.openGeneFile(FLAG_geneFile.c_str(), FLAG_geneFileFormat.c_str());
+
   if (!FLAG_bedFile.empty()) {
     fprintf(stderr, "Use bed file: %s\n", FLAG_bedFile.c_str() );
     std::vector< std::string> fd;
@@ -1783,7 +889,7 @@ int main(int argc, char *argv[])
     for (size_t i = 0; i < fd.size(); ++i ){
       stringTokenize(fd[i], "=", &bed);
       if (bed.size() == 2) {
-        ga.addBedFile(bed[0].c_str(), bed[1].c_str());
+        controller.openBedFile(bed[0].c_str(), bed[1].c_str());
       } else {
         fprintf(stderr, "ERROR: Cannot recognized format [ %s ].\n", fd[i].c_str());
         exit(1);
@@ -1800,45 +906,44 @@ int main(int argc, char *argv[])
     for (size_t i = 0; i < fd.size(); ++i ){
       stringTokenize(fd[i], "=", &gs);
       if (gs.size() == 2) {
-        ga.addGenomeScore(gs[0].c_str(), gs[1].c_str());
+        controller.openGenomeScoreFile(gs[0].c_str(), gs[1].c_str());
       } else {
         fprintf(stderr, "ERROR: Cannot recognized format [ %s ].\n", fd[i].c_str());
         exit(1);
       };
     };
   };
+
+  // if (inputFormat == "vcf" || FLAG_inputFormat.size() == 0) {
+  //   ga.annotateVCF(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
+  // } else if (inputFormat == "plain") {
+  //   ga.annotatePlain(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
+  // } else if (inputFormat == "plink") {
+  //   ga.annotatePlink(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
+  // } else if (inputFormat == "epacts") {
+  //   ga.annotateEpacts(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
+  // } else{
+  //   fprintf(stderr, "Cannot recognize input file format: %s \n", FLAG_inputFile.c_str());
+  //   abort();
+  // };
+
+  std::string chrom;
+  int pos;
+  std::string ref;
+  std::string alt;
+  AnnotationOutputFile aof(FLAG_outputFile.c_str());
+  aof.linkToInput(aif);
+  while (aif.extract(&chrom, &pos, &ref, &alt)) {
+    controller.annotate(chrom, pos, ref, alt);
+    aof.writeResult(controller.getResult());
+  };
+  // aof.writeResult(controller.getResult()); will add this to handle when input only have comment lines
   
-  ga.openReferenceGenome(FLAG_referenceFile.c_str());
-  ga.openCodonFile(FLAG_codonFile.c_str());
-  ga.openPriorityFile(FLAG_priorityFile.c_str());
+  // output stats
+  controller.geneAnnotation.outputAnnotationStats(FLAG_outputFile.c_str());
 
-  ga.setFormat(FLAG_geneFileFormat);
-  ga.setCheckReference(FLAG_checkReference);
-
-  std::string inputFormat = toLower(FLAG_inputFormat);
-  if (!inputFormat.empty() &&
-      inputFormat != "vcf" &&
-      inputFormat != "plain" &&
-      inputFormat != "plink" &&
-      inputFormat != "epacts") {
-    fprintf(stderr, "Unsupported input format [ %s ], we support VCF, plain, plink and EPACTS formats.\n", FLAG_inputFormat.c_str());
-    LOG << "Unsupported input format [ " << FLAG_inputFormat << " ], we support VCF, plain, plink and EPACTS formats.\n";
-    abort();
-  };
-
-  ga.openGeneFile(FLAG_geneFile.c_str());
-  if (inputFormat == "vcf" || FLAG_inputFormat.size() == 0) {
-    ga.annotateVCF(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
-  } else if (inputFormat == "plain") {
-    ga.annotatePlain(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
-  } else if (inputFormat == "plink") {
-    ga.annotatePlink(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
-  } else if (inputFormat == "epacts") {
-    ga.annotateEpacts(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
-  } else{
-    fprintf(stderr, "Cannot recognize input file format: %s \n", FLAG_inputFile.c_str());
-    abort();
-  };
+  // aof.close();
+  // aif.close();
 
   LOG_END_TIME;
   LOG_END ;

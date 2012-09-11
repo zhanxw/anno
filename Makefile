@@ -7,7 +7,7 @@ release: CXXFLAGS = -O2 -DNDEBUG $(DEFAULT_CXXFLAGS)
 release: $(EXEC)
 	-mkdir -p executable
 	cp -f $(EXEC) executable
-debug: CXXFLAGS = -ggdb -O0 $(DEFAULT_CXXFLAGS)
+debug: CXXFLAGS = -Wall -ggdb -O0 $(DEFAULT_CXXFLAGS)
 debug: $(EXEC)
 profile: CXXFLAGS = -ggdb -pg -O0 $(DEFAULT_CXXFLAGS)
 profile: $(EXEC)
@@ -15,12 +15,6 @@ profile: $(EXEC)
 $(EXEC): Main.cpp Gene.h Range.h IO.h Argument.h FreqTable.h GenomeSequence.h LogFile.h StringTemplate.h
 	g++ $(CXXFLAGS) -c Main.cpp
 	g++ $(CXXFLAGS) -o $@ Main.o -lz -lbz2 -lssl -lcrypto
-testBedReader: testBedReader.cpp BedReader.h
-	g++ $(CXXFLAGS) -c testBedReader.cpp
-	g++ $(CXXFLAGS) -o $@ testBedReader.o -lz -lbz2 -lssl -lcrypto
-testGenomeScore: testGenomeScore.cpp GenomeScore.h
-	g++ $(CXXFLAGS) -c testGenomeScore.cpp -O2
-	g++ $(CXXFLAGS) -o $@ testGenomeScore.o -lz -lbz2 -lssl -lcrypto -O2
 clean:
 	rm -f *.o $(EXEC) input.*
 # basic test
@@ -58,7 +52,22 @@ test7: debug
 test8: debug
 	(cd example; ../$(EXEC) -i input.test.vcf -r test.fa -g test.gene.txt -c ../codon.txt -o output.test.region.vcf --bed REGION1=region1.bed,REGION2=region2.bed)
 
-test: test1 test2 test3 test4 test5 test6
+testBedReader: testBedReader.cpp BedReader.h
+	g++ $(CXXFLAGS) -c testBedReader.cpp
+	g++ $(CXXFLAGS) -o $@ testBedReader.o -lz -lbz2 -lssl -lcrypto
+
+test9: testBedReader
+	(cd example; ../testBedReader > output.testBedReader)
+	(cd example; diff  {correct,output}.testBedReader)
+
+testGenomeScore: testGenomeScore.cpp GenomeScore.h
+	g++ $(CXXFLAGS) -c testGenomeScore.cpp -O2
+	g++ $(CXXFLAGS) -o $@ testGenomeScore.o -lz -lbz2 -lssl -lcrypto -O2
+
+test10: testGenomeScore
+	(cd example; ../testGenomeScore > output.testGenomeScore)
+
+test: test1 test2 test3 test4 test5 test6 test7 test8 test9
 
 correct:
 	@echo "WARNING: Regenerate correct testing files. You have 10 seconds to stop..."

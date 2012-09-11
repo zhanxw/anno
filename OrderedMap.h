@@ -26,10 +26,38 @@ class OrderedMap{
         *v = this->keyTypeMap[(*k)];
         return true;
     }
-    unsigned int size() const { return this->keyVec.size();} ;
+    bool at(unsigned int idx, KEY* k, TYPE* v) const{
+        if (idx >= this->size()) return false;
+        *k = this->keyVec[idx];
+
+        typename std::map < KEY, TYPE >::const_iterator iter;
+        iter = this->keyTypeMap.find(*k);
+        if (iter != this->keyTypeMap.end())
+          *v = iter->second;
+        else
+          return false;
+        
+        return true;
+    };
+    bool value(const KEY& key, TYPE* val) const{
+      typename std::map < KEY, TYPE >::const_iterator iter;
+      iter = this->keyTypeMap.find(key);
+      if (iter != this->keyTypeMap.end()){
+        *val = iter->second;
+        return true;
+      } else {
+        return false;
+      }
+    }
+    size_t size() const { return this->keyVec.size();} ;
+    void clear() {
+      keyVec.clear();
+      keyTypeMap.clear();
+    };
   private:
     std::vector < KEY > keyVec;
     std::map < KEY, TYPE > keyTypeMap;
+
 };
 
 #endif /* _ORDEREDMAP_H_ */
