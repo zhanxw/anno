@@ -38,7 +38,7 @@ void banner(FILE* fp) {
       "   ...      Speical Thanks:                    ...     \n"
       "    ...      Hyun Ming Kang, Yanming Li         ...    \n"
       "     ...      zhanxw@umich.edu                    ...  \n"
-      "      ...      Aug 2011                            ... \n"
+      "      ...      Sep 2011                            ... \n"
       "       ................................................\n"
       "                                                       \n"
       ;

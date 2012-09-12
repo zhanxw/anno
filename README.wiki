@@ -65,18 +65,30 @@ Here is the anno help page by invoking anno without any command line arguments:
       ................................................
                                                      
  Required Parameters
-                       -i : Specify input VCF file
-                       -o : Specify output VCF file
-                       -g : Specify gene file
- Optional Parameters
-                       -r : Specify reference genome position
-                       -f : Specify gene file format (default: refFlat, other optio
-                            ns knownGene)
-                       -c : Specify codon file (default: codon.txt)
-                       -u : Specify upstream range (default: 50)
-                       -d : Specify downstream range (default: 50)
-                     --se : Specify splice into exon range (default: 3)
-                     --si : Specify splice into intron range (default: 8)
+                        -i : Specify input VCF file
+                        -o : Specify output VCF file
+ Gene Annotation Parameters
+                        -g : Specify gene file
+                        -r : Specify reference genome position
+             --inputFormat : Specify format (default: vcf). "-f plain " will use fir
+                             st 4 columns as chrom, pos, ref, alt
+          --checkReference : Check whether reference alleles matches genome reference
+                        -f : Specify gene file format (default: refFlat, other optio
+                             ns: knownGene, refGene)
+                        -p : Specify priority of annotations
+                        -c : Specify codon file (default: codon.txt)
+                        -u : Specify upstream range (default: 50)
+                        -d : Specify downstream range (default: 50)
+                      --se : Specify splice into extron range (default: 3)
+                      --si : Specify splice into intron range (default: 8)
+            --outputFormat : Specify predefined annotation words (default or epact)
+ Other Annotation Tools
+             --genomeScore : Specify the folder of genome score (e.g. GERP=dirGerp/,
+                             SIFT=dirSift/)
+                     --bed : Specify the bed file and tag (e.g. ONTARGET1=a1.bed,ONT
+                             ARGET2=a2.bed)
+                   --tabix : Specify the tabix file and tag (e.g. abc.txt.gz(chrom=1
+                             ,pos=7,ref=3,alt=4,SIFT=7,PolyPhen=10)
  Please specify input file
 
 == Input files ==
@@ -133,6 +145,37 @@ The ''-u'' and ''-d'' parameters define the range of upstream and downstream.
  -si how far apart from 3'-end of the gene are counted as upstream
 
 The ''-se'' and ''-si'' defines the splice region. By default, 3 bases into the exon and 8 bases into the introns are defined as splicing sites. If mutations happen in these regions, we will annotate it as "Normal_Splice_Site" unless the mutations happens in the traditionally important "GU...AG" region in the intron, in that case, we will "Essential_Splice_Site" as annotation.
+
+* Annotate by range
+
+                     --bed : Specify the bed file and tag (e.g. ONTARGET1=a1.bed,ONTARGET2=a2.bed)
+
+BED file is commonly used to represent range. Here you will check if certain genome position is contained in one or more ranges specified in the BED format.
+An example BED file, example.bed, is as follows:
+ 1 10 20 a
+ 1 15 40 b
+
+There are two ranges: range a is from chromsome 1 position 10 (inclusive) to chromosome 1 position 20 (exclusive); range b is from chromsome 1 position 15 (inclusive) to chromosome 1 position 40 (exclusive).
+
+When use ''--bed ONTARGET=example.bed'' as parameter, the output may look like this: ''ONTARGET=a,b'' in the VCF INFO field.
+
+* Annotate by genome score
+
+             --genomeScore : Specify the folder of genome score (e.g. GERP=dirGerp/,SIFT=dirSift/)
+
+Genome score is a special binary file format (designed by Hyun) storing per-position genome score, such as GERP score, SIFT score.
+You will need to pre-process those scores in a directory. 
+To annotate genome score, use ''--genomeScore TAG_NAME=DIRECTORY''. In VCF output file, you will have ''TAG_NAME=some_value'' in the INFO field. In other output format, you will see a separate column.
+
+* Annotate by tabix input
+
+                   --tabix : Specify the tabix file and tag (e.g. abc.txt.gz(chrom=1,pos=7,ref=3,alt=4,SIFT=7,PolyPhen=10)
+
+Tabix file can be used in annotation. Here we required you provide bgzipped, indexed file. In above example, we use abc.txt.gz as input, and column 1,7,3,4 as chromosome, position, reference allele, alternative allele. We also use column 7 as SIFT score and column 10 as PolyPhen score. 
+Similar syntax as previous, you will get outputs similar to 'SIFT=0.110;PolyPhen=0.00' in the VCF INFO field.
+NOTE, in bash, please use quote around parenthesis, otherwise parenthesis is not correctly treated. A working example is as follows:
+ --tabix '/net/fantasia/home/hmkang/bin/annovar/humandb/hg19_ljb_all.txt.gz(chrom=1,pos=2,ref=4,alt=5,mySift=6,mySC=7,myPP2=8,myPC=9)' 
+
 
 = Example =
 

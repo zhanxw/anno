@@ -1,12 +1,14 @@
 EXEC = anno
 DEFAULT_CXXFLAGS = -D__STDC_LIMIT_MACROS
 
+
+.PHONY: release debug
+all: debug
+
 LIB = third/tabix/libtabix.a
 third/tabix/libtabix.a:
 	(cd third; make tabix)
 
-.PHONY: release debug
-all: debug
 release: CXXFLAGS = -O2 -DNDEBUG $(DEFAULT_CXXFLAGS)
 release: $(EXEC)
 	-mkdir -p executable
@@ -21,6 +23,8 @@ $(EXEC): Main.cpp Gene.h Range.h IO.h Argument.h FreqTable.h GenomeSequence.h Lo
 	g++ $(CXXFLAGS) -o $@ Main.o $(LIB) -lz -lbz2 -lssl -lcrypto
 clean:
 	rm -f *.o $(EXEC) input.*
+
+
 # basic test
 test1: debug
 	(cd example; ../$(EXEC) -i input.test.vcf -r test.fa -g test.gene.txt -c ../codon.txt -o output.test.vcf)

@@ -456,8 +456,8 @@ public:
       <- group name widt -><- SEP -><----------- flag name width ------------------------->
           GROUP_WIDTH                               FLAG_WIDTH
     */
-    const int GROUP_WIDTH = 27;
-    const int FLAG_WIDTH = 50;
+    const int GROUP_WIDTH = 22;
+    const int FLAG_WIDTH = 60;
     const char SEP[] = " : ";
     const char EMPTY_SEP[] = "   ";
 
@@ -554,8 +554,8 @@ public:
     }
   };
   void Help() {
-    const int FLAG_WIDTH = 25;
-    const int DOC_WIDTH = 55;
+    const int FLAG_WIDTH = 22;
+    const int DOC_WIDTH = 60;
     const char SEP[] = " : ";
     const char EMPTY_SEP[] = "   ";
 
