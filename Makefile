@@ -18,12 +18,17 @@ debug: $(EXEC)
 profile: CXXFLAGS = -ggdb -pg -O0 $(DEFAULT_CXXFLAGS)
 profile: $(EXEC)
 
-$(EXEC): Main.cpp Gene.h Range.h IO.h Argument.h FreqTable.h GenomeSequence.h LogFile.h StringTemplate.h
-	g++ $(CXXFLAGS) -c Main.cpp
+GitVersion.h: .git/HEAD .git/index
+	echo "const char *gitVersion = \"$(shell git rev-parse HEAD)\";" > $@
+
+-include Main.d
+Main.o: Main.cpp
+	g++ -MMD $(CXXFLAGS) -c Main.cpp
+
+$(EXEC): Main.o
 	g++ $(CXXFLAGS) -o $@ Main.o $(LIB) -lz -lbz2 -lssl -lcrypto
 clean:
-	rm -f *.o $(EXEC) input.*
-
+	rm -f *.o *.d $(EXEC) input.*
 
 # basic test
 test1: debug
