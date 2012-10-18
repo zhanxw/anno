@@ -698,8 +698,10 @@ int main(int argc, char *argv[])
   std::string alt;
   AnnotationOutputFile aof(FLAG_outputFile.c_str());
   aof.linkToInput(aif);
+  std::string choppedChr; // chop leading 'chr'
   while (aif.extract(&chrom, &pos, &ref, &alt)) {
-    controller.annotate(chrom, pos, ref, alt);
+    choppedChr = chopChr(chrom);
+    controller.annotate(choppedChr, pos, ref, alt);
     aof.writeResult(controller.getResult());
   };
   // aof.writeResult(controller.getResult()); // TODO: will add this to handle when input only have comment lines

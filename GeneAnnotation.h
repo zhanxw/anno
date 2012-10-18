@@ -323,6 +323,12 @@ public:
                    const std::string& ref, const std::string& alt,
                    char refTriplet[3], char altTriplet[3]) {
     assert(ref.size() == 1 && alt.size() == 1);
+    // deal with no-existing chromosomes (e.g. chrM is in input file, but not in reference file)
+    if (!this->gs.exists(chr)) { 
+      refTriplet[0] = refTriplet[1] = refTriplet[2] = 'N';
+      altTriplet[0] = altTriplet[1] = altTriplet[2] = 'N';
+      return;
+    }
     const Chromosome& seq = this->gs[chr];
     if (codonPos[0] < 0 || codonPos[2] > seq.size()) {
       refTriplet[0] = refTriplet[1] = refTriplet[2] = 'N';
