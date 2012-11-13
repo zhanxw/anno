@@ -418,7 +418,7 @@ public:
       unsigned int idx = it - this->flagVec.begin();
       void* data = this->flagInfoMap[idx].data;
       if (this->flagInfoMap[idx].isParsed) {
-        fprintf(stdout, "WARNING: flag \"%s\" provided more than once, the previous value will be overwritten\n", argv[i]);
+        fprintf(stderr, "WARNING: flag \"%s\" provided more than once, the previous value will be overwritten\n", argv[i]);
       }
       this->flagInfoMap[idx].isParsed = true;
       switch(this->flagInfoMap[idx].pt) {
@@ -447,9 +447,9 @@ public:
     }
   };
   void Status() {
-    fprintf(stdout, "The following parameters are available.  Ones with \"[]\" are in effect:\n");
-    fprintf(stdout, "\n");
-    fprintf(stdout, "Available Options\n");
+    fprintf(stderr, "The following parameters are available.  Ones with \"[]\" are in effect:\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Available Options\n");
     /*
       Format illustration:
       Individual Filter : --indvDepthMin [], --indvDepthMax [], --indvQualMin []
@@ -470,8 +470,8 @@ public:
 
       
       // print group header
-      fprintf(stdout, "%*s", GROUP_WIDTH, k.c_str());
-      fprintf(stdout, "%s", SEP);
+      fprintf(stderr, "%*s", GROUP_WIDTH, k.c_str());
+      fprintf(stderr, "%s", SEP);
 
       int availableFlagWidth = FLAG_WIDTH;
       std::stringstream flagBuffer;
@@ -534,23 +534,23 @@ public:
         
         // if there are not enough spaces and th, we will output a new line
         if (availableFlagWidth < flagWidth && flagWidth < FLAG_WIDTH) {
-          fprintf(stdout, "\n");
-          fprintf(stdout, "%*s", GROUP_WIDTH, " ");
-          fprintf(stdout, "%s", EMPTY_SEP);
+          fprintf(stderr, "\n");
+          fprintf(stderr, "%*s", GROUP_WIDTH, " ");
+          fprintf(stderr, "%s", EMPTY_SEP);
           availableFlagWidth = FLAG_WIDTH;
           if (flagToPrint[0] == ',') {
             flagToPrint = flagToPrint.substr(2, flagToPrint.size() - 2);
           }
-          fprintf(stdout, "%s", flagToPrint.c_str()); // 2 is length of ", "
+          fprintf(stderr, "%s", flagToPrint.c_str()); // 2 is length of ", "
           availableFlagWidth -= flagWidth;
 
           firstFlagInLine = false;
         } else {
-          fprintf(stdout, "%s", flagToPrint.c_str());
+          fprintf(stderr, "%s", flagToPrint.c_str());
           availableFlagWidth -= flagWidth;
         }
       }
-      fprintf(stdout, "\n");
+      fprintf(stderr, "\n");
     }
   };
   void Help() {
@@ -565,7 +565,7 @@ public:
       this->groupNameFlagIndexMap.at(groupIndex, &k, &v);
 
       // print group header
-      fprintf(stdout, "%s\n", k.c_str());
+      fprintf(stderr, "%s\n", k.c_str());
 
       for (size_t i = 0; i < v.size(); i++) {
         int idx = v[i];
@@ -575,19 +575,19 @@ public:
         // int flagWidth = 0;
 
         if (fi.isLongParam) {
-          fprintf(stdout, "%*s%s%s", (int)(FLAG_WIDTH - flag.size() ), "--", flag.c_str(), SEP);
+          fprintf(stderr, "%*s%s%s", (int)(FLAG_WIDTH - flag.size() ), "--", flag.c_str(), SEP);
         } else {
-          fprintf(stdout, "%*s%s%s", (int)(FLAG_WIDTH - flag.size() ), "-", flag.c_str(), SEP);
+          fprintf(stderr, "%*s%s%s", (int)(FLAG_WIDTH - flag.size() ), "-", flag.c_str(), SEP);
         }
 
         for (size_t docIndex = 0; docIndex < fi.doc.size(); docIndex++) {
           if (docIndex != 0 && docIndex % DOC_WIDTH == 0) {
-            fprintf(stdout, "\n");
-            fprintf(stdout, "%*s%s", FLAG_WIDTH, " ", EMPTY_SEP);
+            fprintf(stderr, "\n");
+            fprintf(stderr, "%*s%s", FLAG_WIDTH, " ", EMPTY_SEP);
           }
-          fprintf(stdout, "%c", fi.doc[docIndex]);
+          fprintf(stderr, "%c", fi.doc[docIndex]);
         }
-        fprintf(stdout, "\n");
+        fprintf(stderr, "\n");
       }
     }
   };

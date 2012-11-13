@@ -391,7 +391,7 @@ public:
    */
   bool isInRange(const int pos, const int beg, const int end) {
     if (beg > end) {
-      fprintf(stdout, "in isInRange beg(%d) > end(%d).\n", beg, end);
+      fprintf(stderr, "in isInRange beg(%d) > end(%d).\n", beg, end);
     }
     if (beg <= pos && pos <= end)
       return true;
@@ -424,7 +424,7 @@ public:
    */
   int length(int beg, int end) {
     if (beg > end+1) {
-      fprintf(stdout, "In length beg(%d) > end(%d) + 1; please check gene file format.\n", beg, end);
+      fprintf(stderr, "In length beg(%d) > end(%d) + 1; please check gene file format.\n", beg, end);
     }
     return (end - beg + 1);
   };

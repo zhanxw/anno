@@ -260,7 +260,7 @@ class AnnotationInputFile{
     if (this->checkReference) {
       std::string refFromGenome = this->gs.getBase(*chrom, *pos, *pos + ref->size());
       if ((*ref) != refFromGenome) {
-        fprintf(stdout, "ERROR: Reference allele does not match genome reference [ %s:%d %s]\n", chrom->c_str(), *pos, ref->c_str());
+        fprintf(stderr, "ERROR: Reference allele does not match genome reference [ %s:%d %s]\n", chrom->c_str(), *pos, ref->c_str());
         LOG << "ERRROR: Reference allele [" << ref <<   "]  does not match reference genome [" << refFromGenome << "] at " << *chrom << ":" << *pos << "\n";
       };
     }
@@ -292,18 +292,22 @@ class AnnotationInputFile{
 class AnnotationOutputFile{
  public:
   AnnotationOutputFile(const char* out):headerOutputted(false), totalVariants(0),outputFileName(out) {
-    this->fout = fopen(out, "wt");
-    if (!this->fout) {
-      fprintf(stderr, "Cannot open otuput file %s for write.\n", out);
-    };
+    if (strncmp (out, "stdout", 6) ) {
+      this->fout = fopen(out, "wt");
+      if (!this->fout) {
+        fprintf(stderr, "Cannot open otuput file %s for write.\n", out);
+      }
+    } else {
+      this->fout = stdout;
+    }
   };
   ~AnnotationOutputFile() {
     this->close();
   }
   void close() {
     if (this->fout) {
-      fprintf(stdout, "DONE: %d varaints are annotated.\n", totalVariants);
-      fprintf(stdout, "DONE: Generated annotation output in [ %s ].\n", outputFileName.c_str());
+      fprintf(stderr, "DONE: %d varaints are annotated.\n", totalVariants);
+      fprintf(stderr, "DONE: Generated annotation output in [ %s ].\n", outputFileName.c_str());
       fclose(this->fout);
       this->fout = NULL;
     }
@@ -513,7 +517,7 @@ class AnnotationController{
 
 int main(int argc, char *argv[])
 {
-  banner(stdout);
+  banner(stderr);
 
   BEGIN_PARAMETER_LIST(pl)
       ADD_PARAMETER_GROUP(pl, "Required Parameters")

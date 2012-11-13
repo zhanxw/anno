@@ -189,6 +189,8 @@ public:
   bool exists(const std::string& c){
     if (this->data.find(c) != this->data.end())
       return true;
+    if (faidx.getInfo(c) != NULL)
+      return true;
     return false;
   }
 public:

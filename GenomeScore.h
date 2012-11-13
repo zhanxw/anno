@@ -27,7 +27,7 @@ public:
         ++lineNo;
       }
       if (lineNo % 1000000l == 0) {
-        fprintf(stdout, "\rFinished %s:%d ...", chrom, lineNo);
+        fprintf(stderr, "\rFinished %s:%d ...", chrom, lineNo);
       };
     };
   };

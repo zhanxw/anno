@@ -45,7 +45,7 @@ class GeneAnnotation{
     }
 
     // read gene file
-    fprintf(stdout, "Load gene file %s...\n", geneFileName);
+    fprintf(stderr, "Load gene file %s...\n", geneFileName);
     std::string line;
     std::vector<std::string> fields;
     LineReader lr(geneFileName);
@@ -60,26 +60,26 @@ class GeneAnnotation{
     }
     // make sure genes are ordered
     this->sortGene();
-    fprintf(stdout, "DONE: %d gene loaded.\n", totalGene);
+    fprintf(stderr, "DONE: %d gene loaded.\n", totalGene);
     LOG << "Gene file " << geneFileName << " loads succeed!\n";
     return 0;
   };
   void openCodonFile(const char* codonFileName) {
-    fprintf(stdout, "Load codon file %s...\n", codonFileName);
+    fprintf(stderr, "Load codon file %s...\n", codonFileName);
     this->codon.open(codonFileName);
-    fprintf(stdout, "DONE: codon file loaded.\n");
+    fprintf(stderr, "DONE: codon file loaded.\n");
     LOG << "Codon file " << codonFileName << " loads succeed!\n";
     return;
   };
   void openReferenceGenome(const char* referenceGenomeFileName) {
-    fprintf(stdout, "Load reference genome %s...\n", referenceGenomeFileName);
+    fprintf(stderr, "Load reference genome %s...\n", referenceGenomeFileName);
     this->gs.open(referenceGenomeFileName);
-    fprintf(stdout, "DONE: %d chromosomes and %ld bases are loaded.\n", this->gs.size(), this->gs.getGenomeLength());
+    fprintf(stderr, "DONE: %d chromosomes and %ld bases are loaded.\n", this->gs.size(), this->gs.getGenomeLength());
     LOG << "Reference genome file " << referenceGenomeFileName << " loads succeed!\n";
     return;
   };
   void openPriorityFile(const char* fileName) {
-    fprintf(stdout, "Load priority file %s...\n", fileName);
+    fprintf(stderr, "Load priority file %s...\n", fileName);
     int ret = this->priority.open(fileName);
     fprintf(stderr, "DONE: %d priority annotation types loaded.\n", ret);
     LOG << "Priority file " << fileName << " load succeed!\n";
@@ -96,31 +96,31 @@ class GeneAnnotation{
     // output annotation frequency (all types of annotation)
     std::string ofs = fn+".anno.frq";
     this->printAnnotationFrequency(ofs.c_str());
-    fprintf(stdout, "DONE: Generated frequency of each annotype type in [ %s ].\n", ofs.c_str());
+    fprintf(stderr, "DONE: Generated frequency of each annotype type in [ %s ].\n", ofs.c_str());
     LOG << "Generate frequency of each annotation type in " << ofs << " succeed!\n";
 
     // output annotation frequency
     ofs = fn+".top.anno.frq";
     this->printTopPriorityAnnotationFrequency(ofs.c_str());
-    fprintf(stdout, "DONE: Generated frequency of each highest priority annotation type in [ %s ].\n", ofs.c_str());
+    fprintf(stderr, "DONE: Generated frequency of each highest priority annotation type in [ %s ].\n", ofs.c_str());
     LOG << "Generate frequency of high priority for highest priority annotation type in " << ofs << " succeed!\n";
 
     // output base change frequency
     ofs = fn+".base.frq";
     this->printBaseChangeFrequency(ofs.c_str());
-    fprintf(stdout, "DONE: Generated frequency of each base change in [ %s ].\n", ofs.c_str());
+    fprintf(stderr, "DONE: Generated frequency of each base change in [ %s ].\n", ofs.c_str());
     LOG << "Generate frequency of each base change in " << ofs << " succeed!\n";
 
     // output codon change frequency
     ofs = fn+".codon.frq";
     this->printCodonChangeFrequency(ofs.c_str());
-    fprintf(stdout, "DONE: Generated frequency of each codon change in [ %s ].\n", ofs.c_str());
+    fprintf(stderr, "DONE: Generated frequency of each codon change in [ %s ].\n", ofs.c_str());
     LOG << "Generate frequency of each codon change in " << ofs << " succeed!\n";
 
     // output indel length frequency
     ofs = fn+".indel.frq";
     this->printIndelLengthFrequency(ofs.c_str());
-    fprintf(stdout, "DONE: Generated frequency of indel length in [ %s ].\n", ofs.c_str());
+    fprintf(stderr, "DONE: Generated frequency of indel length in [ %s ].\n", ofs.c_str());
     LOG << "Generate frequency of indel length in " << ofs << " succeed!\n";
   };
 public:
