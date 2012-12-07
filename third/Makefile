@@ -1,7 +1,7 @@
 # download all third party library and compile them
 
 LIB = tabix pcre eigen gsl
-all: $LIB
+all: $(LIB)
 
 tabix: tabix-0.2.5.tar.bz2
 	-mv tabix-0.2.5.tar.bz2* tabix-0.2.5.tar.bz2
