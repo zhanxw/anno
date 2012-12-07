@@ -3,11 +3,11 @@
 LIB = tabix pcre eigen gsl
 all: $(LIB)
 
-tabix: tabix-0.2.5.tar.bz2
-	-mv tabix-0.2.5.tar.bz2* tabix-0.2.5.tar.bz2
-	tar jvxf tabix-0.2.5.tar.bz2
-	ln -s -f tabix-0.2.5 tabix
-	(cd tabix-0.2.5; make)
+tabix: tabix-0.2.6.tar.bz2
+	-mv tabix-0.2.6.tar.bz2* tabix-0.2.6.tar.bz2
+	tar jvxf tabix-0.2.6.tar.bz2
+	ln -s -f tabix-0.2.6 tabix
+	(cd tabix-0.2.6; make)
 
 pcre: pcre-8.21.tar.gz
 	-mv pcre-8.21.tar.gz* pcre-8.21.tar.gz

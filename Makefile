@@ -21,6 +21,8 @@ profile: $(EXEC)
 GitVersion.h: .git/HEAD .git/index
 	echo "const char *gitVersion = \"$(shell git rev-parse HEAD)\";" > $@
 
+TabixReader.h: $(LIB)
+
 -include Main.d
 Main.o: Main.cpp
 	g++ -MMD $(CXXFLAGS) -c Main.cpp
