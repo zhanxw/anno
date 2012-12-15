@@ -184,7 +184,7 @@ class AnnotationInputFile{
     } while (this->line.empty());
 
     // for any line beginning with '#', store headers
-    while (line[0] == '#') {
+    while (line[0] == '#' || line.substr(0,5) == "CHROM") {
       this->header.push_back(line);
       do {
         ret = this->lr->readLine(&this->line);
@@ -320,8 +320,19 @@ class AnnotationOutputFile{
   };
   void writeHeader(const std::vector< std::string> & h) {
     for (size_t i = 0; i < h.size(); ++i) {
-      fputs(h[i].c_str(), this->fout);
-      fputc('\n', this->fout);
+      if (i != h.size() - 1) {
+        fputs(h[i].c_str(), this->fout);
+        fputc('\n', this->fout);
+      } else { // last line
+        if ( (aif->getFormat() == PLAIN || aif->getFormat() == PLINK) &&
+             (h[i].substr(0, 5) == "CHROM" || h[i].substr(0, 6) == "#CHROM") ) {
+          fputs(h[i].c_str(), this->fout);
+          fputs("\tANNO\tANOO_FULL\n", this->fout);
+        } else {
+          fputs(h[i].c_str(), this->fout);
+          fputc('\n', this->fout);
+        }
+      }
     }
   }
   void writeResult(const OrderedMap<std::string, std::string>& res) {
@@ -400,7 +411,6 @@ class AnnotationOutputFile{
   FILE* fout;
   int totalVariants;
   std::string outputFileName;
-
 }; // class AnnotationOutputFile
 
 // run annotations (gene based, bed file, genomeScores, tabix database)
@@ -682,7 +692,9 @@ int main(int argc, char *argv[])
       }
     }
     controller.addTabixReader(tabix);
-  }
+  } // end halding tabix database
+
+  
   // if (inputFormat == "vcf" || FLAG_inputFormat.size() == 0) {
   //   ga.annotateVCF(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
   // } else if (inputFormat == "plain") {
