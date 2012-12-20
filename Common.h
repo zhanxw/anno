@@ -12,5 +12,18 @@
 #define WITHIN_GENE_SEPARATOR ":"
 // #define GENE_SEPARATOR "|"
 
+inline bool hasSuffix(const std::string& s, const std::string& suffix) {
+  size_t l = s.size();
+  size_t l2 = suffix.size();
+  if ( l < l2) return false;
+  for (size_t i = 1; i <= l2; ++i) {
+    if (suffix[l2 -i ] != s[l-i])
+      return false;
+  }
+  return true;
+};
+
+
+
 
 #endif /* _COMMON_H_ */

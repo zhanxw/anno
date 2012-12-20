@@ -492,10 +492,14 @@ public:
           firstFlagInLine = false;
         if (fi.isLongParam) {
           // flagWidth += sprintf(flagBuffer+flagWidth, "--%s [", flag.c_str());
-          flagBuffer << "--" << flag << " [";
+          flagBuffer << "--" << flag;
+          if (fi.pt != BOOL_TYPE || fi.isParsed)
+            flagBuffer << " [";
         } else {
           // flagWidth += sprintf(flagBuffer+flagWidth, "-%s [", flag.c_str());
-          flagBuffer << "-" << flag << " [";
+          flagBuffer << "-" << flag;
+          if (fi.pt != BOOL_TYPE || fi.isParsed)
+            flagBuffer << " [";
         }
         if (fi.isParsed) {
           switch(fi.pt){
@@ -526,7 +530,8 @@ public:
           }
         }
         //flagWidth += sprintf(flagBuffer+flagWidth, "]");
-        flagBuffer << "]";
+        if (fi.pt != BOOL_TYPE || fi.isParsed)
+          flagBuffer << "]";
 
         std::string flagToPrint = flagBuffer.str();
         flagWidth = flagToPrint.size();

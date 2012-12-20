@@ -94,7 +94,23 @@ test11: testTabixReader
 	(cd example; ../testTabixReader > output.testTabixReader)
 	(cd example; diff {correct,output}.testTabixReader)
 
-test: test1 test2 test3 test4 test5 test6 test7 test8 test9 test10 test11
+# test gz output and index
+test12: debug
+	(cd example; ../$(EXEC) -i input.100.vcf.gz -r ../resources/human.g1k.v37.fa -f refGene -g ../resources/refGene.txt.gz -c ../codon.txt -o output.100.refGene.vcf.gz --indexOutput)
+	(cd example; diff {correct,output}.100.refGene.vcf.gz; diff {correct,output}.100.refGene.vcf.gz.tbi)
+
+# test gz output for plain text file annotation
+test13: debug
+	(cd example; ../$(EXEC) --inputFormat plain -i input.test2.plain.txt -r test.fa -g test.gene.txt -c ../codon.txt -o output.test2.plain.txt.gz --indexOutput)
+	(cd example; diff {correct,output}.test2.plain.txt.gz; diff {correct,output}.test2.plain.txt.gz.tbi)
+
+# test gz output and index for plain text file annotation
+test14: debug
+	(cd example; ../$(EXEC) --inputFormat plain -i input.test3.plain.txt -r test.fa -g test.gene.txt -c ../codon.txt -o output.test3.plain.txt.gz --indexOutput)
+	(cd example; diff {correct,output}.test3.plain.txt.gz; diff {correct,output}.test3.plain.txt.gz.tbi)
+
+test: test1 test2 test3 test4 test5 test6 test7 test8 test9 test10 test11 test12 test13 test14
+
 
 correct:
 	@echo "WARNING: Regenerate correct testing files. You have 10 seconds to stop..."

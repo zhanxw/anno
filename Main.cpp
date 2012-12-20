@@ -181,15 +181,14 @@ class AnnotationController{
   OrderedMap<std::string, std::string> result; // store all types of annotation results
 };
 
-
 int main(int argc, char *argv[])
 {
   banner(stderr);
 
   BEGIN_PARAMETER_LIST(pl)
       ADD_PARAMETER_GROUP(pl, "Required Parameters")
-      ADD_STRING_PARAMETER(pl, inputFile, "-i", "Specify input VCF file")
-      ADD_STRING_PARAMETER(pl, outputFile, "-o", "Specify output VCF file")
+      ADD_STRING_PARAMETER(pl, inputFile, "-i", "Specify input file")
+      ADD_STRING_PARAMETER(pl, outputFile, "-o", "Specify output file")
       ADD_PARAMETER_GROUP(pl, "Gene Annotation Parameters")
       ADD_STRING_PARAMETER(pl, geneFile, "-g", "Specify gene file")
       ADD_STRING_PARAMETER(pl, referenceFile, "-r", "Specify reference genome position")      
@@ -203,6 +202,7 @@ int main(int argc, char *argv[])
       ADD_INT_PARAMETER(pl, spliceIntoExon, "--se", "Specify splice into extron range (default: 3)")
       ADD_INT_PARAMETER(pl, spliceIntoIntron, "--si", "Specify splice into intron range (default: 8)")
       ADD_STRING_PARAMETER(pl, outputFormat, "--outputFormat", "Specify predefined annotation words (default or epact)")
+      ADD_BOOL_PARAMETER(pl, indexOutput, "--indexOutput", "Specify whether to index output file using tabix (require .gz suffix for output file)")      
       ADD_PARAMETER_GROUP(pl, "Other Annotation Tools")
       ADD_STRING_PARAMETER(pl, genomeScore, "--genomeScore", "Specify the folder of genome score (e.g. GERP=dirGerp/,SIFT=dirSift/)")
       ADD_STRING_PARAMETER(pl, bedFile, "--bed", "Specify the bed file and tag (e.g. ONTARGET1=a1.bed,ONTARGET2=a2.bed)")
@@ -225,7 +225,11 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Please specify output file\n");
     exit(1);
   }
-
+  if (!hasSuffix(FLAG_outputFile,".gz") && FLAG_indexOutput) {
+    fprintf(stderr, "Please give output file \".gz\" suffix to enable index (--indexOutput).\n");
+    exit(1);
+  }
+  
   GeneAnnotationParam param;
   param.upstreamRange = FLAG_upstreamRange ? FLAG_upstreamRange : 50;
   param.downstreamRange = FLAG_downstreamRange ? FLAG_downstreamRange : 50;
@@ -279,7 +283,6 @@ int main(int argc, char *argv[])
   aif.setCheckReference(FLAG_checkReference);
 
   AnnotationController controller(aif);
-
 
   controller.geneAnnotation.setAnnotationParameter(param);
   controller.geneAnnotation.openReferenceGenome(FLAG_referenceFile.c_str());
@@ -385,6 +388,14 @@ int main(int argc, char *argv[])
   aof.close();
   aif.close();
   LOG << "Annotate " << FLAG_inputFile << " to " << FLAG_outputFile << " succeed!\n";
+
+  if (FLAG_indexOutput) {
+    if (aof.indexOutput() == 0) {
+      fprintf(stderr, "DONE: Indexing succeed!\n");
+    } else {
+      fprintf(stderr, "WARNING: Indexing failed!\n");
+    }
+  };
 
   LOG_END_TIME;
   LOG_END ;

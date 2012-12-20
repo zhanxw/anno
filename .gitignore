@@ -1,6 +1,7 @@
 *~
 *.o
 *.umfa
+*.d
 
 # Compiled Object files
 *.slo

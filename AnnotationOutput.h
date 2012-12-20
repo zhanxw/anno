@@ -110,6 +110,7 @@ class AnnotationOutput{
     v.resize( it - v.begin());
     return v.size();
   };
+
  private:
   StringTemplate topPriorityTemplate;
   StringTemplate geneTemplate;
