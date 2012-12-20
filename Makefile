@@ -23,12 +23,15 @@ GitVersion.h: .git/HEAD .git/index
 
 TabixReader.h: $(LIB)
 
+-include IO.d
+IO.o: IO.h IO.cpp
+	g++ -MMD $(CXXFLAGS) -c IO.cpp
 -include Main.d
 Main.o: Main.cpp $(LIB)
 	g++ -MMD $(CXXFLAGS) -c Main.cpp
 
-$(EXEC): Main.o 
-	g++ $(CXXFLAGS) -o $@ Main.o $(LIB) -lz -lbz2 -lssl -lcrypto
+$(EXEC): Main.o IO.o
+	g++ $(CXXFLAGS) -o $@ Main.o IO.o $(LIB) -lz -lbz2 -lssl -lcrypto
 clean:
 	rm -f *.o *.d $(EXEC) input.*
 
