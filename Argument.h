@@ -15,6 +15,7 @@
 
 #include "OrderedMap.h"
 #include "TypeConversion.h"
+#include "LineBreaker.h"
 
 #define UNUSED(x) ((void)(x))
 
@@ -456,114 +457,84 @@ public:
       <- group name widt -><- SEP -><----------- flag name width ------------------------->
           GROUP_WIDTH                               FLAG_WIDTH
     */
-    const int GROUP_WIDTH = 22;
-    const int FLAG_WIDTH = 60;
-    const char SEP[] = " : ";
-    const char EMPTY_SEP[] = "   ";
 
-    // OrderedMap<std::string, std::vector<std::string> > content;
-    // will make output look better
+    LineBreaker leftColumn(FLAG_WIDTH);
+    LineBreaker rightColumn(DOC_WIDTH);
+    rightColumn.setSeparator(",");
+    std::string left;
+    std::string right;
+    std::string rightItem;
+    
     for (size_t groupIndex = 0; groupIndex < this->groupNameFlagIndexMap.size(); ++groupIndex){
       std::string k;
       std::vector<unsigned int> v;
       this->groupNameFlagIndexMap.at(groupIndex, &k, &v);
 
-      
-      // print group header
-      fprintf(stderr, "%*s", GROUP_WIDTH, k.c_str());
-      fprintf(stderr, "%s", SEP);
+      // process group header
+      left = k;
+      left += " :";
+      right.clear();
 
-      int availableFlagWidth = FLAG_WIDTH;
-      std::stringstream flagBuffer;
-      bool firstFlagInLine = true;
       for (size_t i = 0; i < v.size(); i++) { // loop flags under the same param group
         int idx = v[i];
-        std::string flag = this->flagVec[idx];
+        const std::string& flag = this->flagVec[idx];
         FlagInfo &fi = this->flagInfoMap[idx];
         void* data = fi.data;
-        int flagWidth = 0;
 
-        // print the flag to the flagBuffer
-        if (!firstFlagInLine) {
-          // flagWidth += sprintf(flagBuffer+flagWidth, ", ");
-          flagBuffer << ", ";
-        }
-        else
-          firstFlagInLine = false;
         if (fi.isLongParam) {
-          // flagWidth += sprintf(flagBuffer+flagWidth, "--%s [", flag.c_str());
-          flagBuffer << "--" << flag;
-          if (fi.pt != BOOL_TYPE || fi.isParsed)
-            flagBuffer << " [";
+          rightItem += " --";
+          rightItem += flag;
+          if (fi.pt != BOOL_TYPE || fi.isParsed) {
+            rightItem += " [";
+          }
         } else {
-          // flagWidth += sprintf(flagBuffer+flagWidth, "-%s [", flag.c_str());
-          flagBuffer << "-" << flag;
-          if (fi.pt != BOOL_TYPE || fi.isParsed)
-            flagBuffer << " [";
+          rightItem += " -";
+          rightItem += flag;
+          if (fi.pt != BOOL_TYPE || fi.isParsed) {
+            rightItem += " [";
+          }
         }
         if (fi.isParsed) {
           switch(fi.pt){
             case BOOL_TYPE:
               if (*(bool*)data) {
-                // flagWidth += sprintf(flagBuffer+flagWidth, "true");
-                flagBuffer << "true";
+                rightItem += "true";
               } else {
-                //flagWidth += sprintf(flagBuffer+flagWidth, "false");
-                flagBuffer << "false";
+                rightItem += "false";
               }
               break;
             case INT_TYPE:
-              // flagWidth += sprintf(flagBuffer+flagWidth, "%d", *(int*)data);
-              flagBuffer << *(int*)data;
+              rightItem += toString(*(int*)data);
               break;
             case DOUBLE_TYPE:
-              // flagWidth += sprintf(flagBuffer+flagWidth, "%lf", *(double*)data);
-              flagBuffer << *(double*)data;
+              rightItem += toString(*(double*)data);
               break;
             case STRING_TYPE:
-              // flagWidth += sprintf(flagBuffer+flagWidth, "%s", ((std::string*)data)->c_str());
-              flagBuffer << *(std::string*)data;
+              rightItem += *(std::string*)data;
               break;
             default:
               fprintf(stderr, "ERROR: That should be a bug, report to zhanxw@gmail.com");
               return;
           }
         }
-        //flagWidth += sprintf(flagBuffer+flagWidth, "]");
-        if (fi.pt != BOOL_TYPE || fi.isParsed)
-          flagBuffer << "]";
-
-        std::string flagToPrint = flagBuffer.str();
-        flagWidth = flagToPrint.size();
-        flagBuffer.str(std::string()); // reset string buffer
-        
-        // if there are not enough spaces and th, we will output a new line
-        if (availableFlagWidth < flagWidth && flagWidth < FLAG_WIDTH) {
-          fprintf(stderr, "\n");
-          fprintf(stderr, "%*s", GROUP_WIDTH, " ");
-          fprintf(stderr, "%s", EMPTY_SEP);
-          availableFlagWidth = FLAG_WIDTH;
-          if (flagToPrint[0] == ',') {
-            flagToPrint = flagToPrint.substr(2, flagToPrint.size() - 2);
-          }
-          fprintf(stderr, "%s", flagToPrint.c_str()); // 2 is length of ", "
-          availableFlagWidth -= flagWidth;
-
-          firstFlagInLine = false;
-        } else {
-          fprintf(stderr, "%s", flagToPrint.c_str());
-          availableFlagWidth -= flagWidth;
+        if (fi.pt != BOOL_TYPE || fi.isParsed) {
+          rightItem += "]";
         }
-      }
-      fprintf(stderr, "\n");
+
+        right += rightItem;
+        right += ",";
+        rightItem.clear();
+      } // end loop per param group
+      // fprintf(stderr, "\n");
+      leftColumn.setContent(left);
+      rightColumn.setContent(right);      
+      printTwoColumn(stderr, leftColumn, rightColumn, "");
     }
   };
   void Help() {
-    const int FLAG_WIDTH = 22;
-    const int DOC_WIDTH = 60;
-    const char SEP[] = " : ";
-    const char EMPTY_SEP[] = "   ";
-
+    LineBreaker leftColumn(FLAG_WIDTH);
+    LineBreaker rightColumn(DOC_WIDTH);
+    std::string left;
     for (size_t groupIndex = 0; groupIndex < this->groupNameFlagIndexMap.size(); ++groupIndex){
       std::string k;
       std::vector<unsigned int> v;
@@ -574,25 +545,21 @@ public:
 
       for (size_t i = 0; i < v.size(); i++) {
         int idx = v[i];
-        std::string flag = this->flagVec[idx];
+        const std::string& flag = this->flagVec[idx];
         FlagInfo &fi = this->flagInfoMap[idx];
-        // void* data = fi.data;
-        // int flagWidth = 0;
 
         if (fi.isLongParam) {
-          fprintf(stderr, "%*s%s%s", (int)(FLAG_WIDTH - flag.size() ), "--", flag.c_str(), SEP);
+          left = "--";
+          left += flag;
         } else {
-          fprintf(stderr, "%*s%s%s", (int)(FLAG_WIDTH - flag.size() ), "-", flag.c_str(), SEP);
+          left = "-";
+          left += flag;
         }
+        left += " :";
 
-        for (size_t docIndex = 0; docIndex < fi.doc.size(); docIndex++) {
-          if (docIndex != 0 && docIndex % DOC_WIDTH == 0) {
-            fprintf(stderr, "\n");
-            fprintf(stderr, "%*s%s", FLAG_WIDTH, " ", EMPTY_SEP);
-          }
-          fprintf(stderr, "%c", fi.doc[docIndex]);
-        }
-        fprintf(stderr, "\n");
+        leftColumn.setContent(left);
+        rightColumn.setContent(fi.doc);
+        printTwoColumn(stderr, leftColumn, rightColumn, " ");
       }
     }
   };
@@ -608,6 +575,8 @@ private:
   // aka. positional argument,
   // those not processed argument
   std::vector<std::string>* ptrRemainingArg;
+  const static int FLAG_WIDTH = 25;
+  const static int DOC_WIDTH = 55; 
 };
 
 #define BEGIN_PARAMETER_LIST(pp)                \

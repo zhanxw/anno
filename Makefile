@@ -109,7 +109,9 @@ test14: debug
 	(cd example; ../$(EXEC) --inputFormat plain -i input.test3.plain.txt -r test.fa -g test.gene.txt -c ../codon.txt -o output.test3.plain.txt.gz --indexOutput)
 	(cd example; diff {correct,output}.test3.plain.txt.gz; diff {correct,output}.test3.plain.txt.gz.tbi)
 
-test: test1 test2 test3 test4 test5 test6 test7 test8 test9 test10 test11 test12 test13 test14
+test15: testLineBreaker
+
+test: test1 test2 test3 test4 test5 test6 test7 test8 test9 test10 test11 test12 test13 test14 test15
 
 
 correct:
@@ -134,7 +136,8 @@ Log: LogFile.cpp LogFile.h
 
 testStringTemplate: testStringTemplate.cpp StringTemplate.h
 	g++ -g -o $@ $<
-
+testLineBreaker: testLineBreaker.cpp LineBreaker.h
+	g++ -g -o $@ $<
 doc:
 	java -jar ext/wiki2html.jar README.wiki > README.html 
 	pandoc -f html -t markdown README.html > README.md 
