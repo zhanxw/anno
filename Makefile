@@ -107,7 +107,7 @@ test13: debug
 # test gz output and index for plain text file annotation
 test14: debug
 	(cd example; ../$(EXEC) --inputFormat plain -i input.test3.plain.txt -r test.fa -g test.gene.txt -c ../codon.txt -o output.test3.plain.txt.gz --indexOutput)
-	(cd example; diff {correct,output}.test3.plain.txt.gz; diff {correct,output}.test3.plain.txt.gz.tbi)
+	(cd example; zdiff {correct,output}.test3.plain.txt.gz; diff {correct,output}.test3.plain.txt.gz.tbi)
 
 test15: testLineBreaker
 

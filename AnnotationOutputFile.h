@@ -67,7 +67,7 @@ AnnotationOutputFile(const std::string& out):headerOutputted(false), totalVarian
         if ( (aif->getFormat() == PLAIN || aif->getFormat() == PLINK) &&
              (h[i].substr(0, 5) == "CHROM" || h[i].substr(0, 6) == "#CHROM") ) {
           this->fout->write(h[i].c_str());
-          this->fout->write("\tANNO\tANOO_FULL\n");
+          this->fout->write("\tANNO\tANNO_FULL\n");
         } else {
           this->fout->write(h[i].c_str());
           this->fout->write("\n");
