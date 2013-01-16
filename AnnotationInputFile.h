@@ -118,7 +118,8 @@ class AnnotationInputFile{
     } while (this->line.empty());
 
     // for any line beginning with '#', store headers
-    while (line[0] == '#' || line.substr(0,5) == "CHROM") {
+    // " CHR " is for PLINK header, "CHROM" is for other headers    
+    while (line[0] == '#' || line.substr(0,5) == "CHROM" || line.substr(0, 5) == " CHR ") { 
       this->header.push_back(line);
       do {
         ret = this->lr->readLine(&this->line);
@@ -128,7 +129,7 @@ class AnnotationInputFile{
     }
 
 
-    stringTokenize(line, "\t ", &fd);
+    stringNaturalTokenize(line, "\t ", &fd);
 
     switch (this->format){
       case VCF:

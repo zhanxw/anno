@@ -355,20 +355,6 @@ int main(int argc, char *argv[])
     controller.addTabixReader(tabix);
   } // end halding tabix database
 
-  
-  // if (inputFormat == "vcf" || FLAG_inputFormat.size() == 0) {
-  //   ga.annotateVCF(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
-  // } else if (inputFormat == "plain") {
-  //   ga.annotatePlain(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
-  // } else if (inputFormat == "plink") {
-  //   ga.annotatePlink(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
-  // } else if (inputFormat == "epacts") {
-  //   ga.annotateEpacts(FLAG_inputFile.c_str(), FLAG_outputFile.c_str());
-  // } else{
-  //   fprintf(stderr, "Cannot recognize input file format: %s \n", FLAG_inputFile.c_str());
-  //   abort();
-  // };
-
   std::string chrom;
   int pos;
   std::string ref;

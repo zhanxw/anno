@@ -83,6 +83,7 @@ public:
     this->info = chrom.info;
   };
 public:
+  // here offset is 0-based index
   char operator[] (unsigned int offset) const {
     int lineNo = offset / info->basePerLine;
     int remainder = offset % info->basePerLine;
