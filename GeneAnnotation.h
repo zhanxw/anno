@@ -180,7 +180,7 @@ private:
         // annotationPerGene.dump();
         this->annotationResults.push_back(annotationPerGene);
       }
-      if ( i == 0 ) {
+      if ( this->annotationResults.empty() ) {
         annotationPerGene.add(INTERGENIC);
         this->annotationResults.push_back(annotationPerGene);
       }
