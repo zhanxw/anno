@@ -54,7 +54,8 @@ const char* OutputAnnotationString::defaultAnnotationString[] = {
   "Downstream",
   "SNV",
   "Noncoding",
-  "Intergenic"
+  "Intergenic",
+  "Monomorphic"
 };
 
 const char* OutputAnnotationString::epactAnnotationString[]= {

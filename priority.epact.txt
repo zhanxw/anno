@@ -38,11 +38,8 @@ Noncoding
 # not import
 Intergenic
 
-
-
-
-
-
+# Monomorphic
+Monomorphic
 
 
 

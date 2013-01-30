@@ -40,6 +40,10 @@ class AnnotationInputFile{
 
     // open input files
     this->lr = new LineReader(inputFileName);
+
+    // init values
+    checkReference = true;
+    failedReferenceSite = 0;
   };
   ~AnnotationInputFile() {
     this->close();
@@ -48,6 +52,10 @@ class AnnotationInputFile{
     if (this->lr) {
       delete lr;
       this->lr = NULL;
+    }
+    if (checkReference && failedReferenceSite > 0) {
+      fprintf(stderr, "ERROR: Total [ %d ] sites have unmatched Reference alleles\n", failedReferenceSite);
+      LOG << "ERROR: Total [ " << failedReferenceSite << " ] sites have unmatched Reference alleles\n";
     }
   };
 
@@ -129,10 +137,10 @@ class AnnotationInputFile{
     }
 
 
-    stringNaturalTokenize(line, "\t ", &fd);
 
     switch (this->format){
       case VCF:
+        stringTokenize(line, "\t ", &fd);
         if (fd.size() < 5) return false;
         *chrom = fd[0];
         *pos = toInt(fd[1]);
@@ -140,6 +148,7 @@ class AnnotationInputFile{
         *alt = fd[4];
         break;
       case PLAIN:
+        stringNaturalTokenize(line, "\t ", &fd);
         if (fd.size() < 4) return false;
         *chrom = fd[0];
         *pos = toInt(fd[1]);
@@ -147,6 +156,7 @@ class AnnotationInputFile{
         *alt = fd[3];
         break;
       case PLINK:
+        stringNaturalTokenize(line, "\t ", &fd);
         if (fd.size() < 10) return false;
         *chrom = fd[0];
         *pos = toInt(fd[2]);
@@ -158,6 +168,7 @@ class AnnotationInputFile{
         break;
       case EPACTS:
         {
+          stringNaturalTokenize(line, "\t ", &fd);
           // e.g.
           // 20:139681_G/A   266     1       1       0.0018797       NA      NA
           // find
@@ -195,7 +206,10 @@ class AnnotationInputFile{
     if (this->checkReference) {
       std::string refFromGenome = this->gs.getBase(*chrom, *pos, *pos + ref->size());
       if ((*ref) != refFromGenome) {
-        fprintf(stderr, "ERROR: Reference allele does not match genome reference [ %s:%d %s]\n", chrom->c_str(), *pos, ref->c_str());
+        ++ failedReferenceSite;
+        if (failedReferenceSite <= 10) { // output at most 10 warnings
+          fprintf(stderr, "ERROR: Reference allele does not match genome reference [ %s:%d %s]\n", chrom->c_str(), *pos, ref->c_str());
+        }
         LOG << "ERRROR: Reference allele [" << ref <<   "]  does not match reference genome [" << refFromGenome << "] at " << *chrom << ":" << *pos << "\n";
       };
     }
@@ -215,6 +229,7 @@ class AnnotationInputFile{
   };
  private:
   bool checkReference;
+  int failedReferenceSite;
   InputFileFormat format;
   LineReader* lr;
   std::vector< std::string> fd;

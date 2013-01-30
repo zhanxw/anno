@@ -1,14 +1,16 @@
-Analysis program [ ../anno ] started on Mon Aug 13 13:37:35 2012
-# ParameterList created by zhanxw on dumbo at Mon Aug 13 13:37:35 2012
--i "input.test.plain.txt" -o "correct.test.plain.txt" -g "test.gene.txt" --inputFormat "plain" -r "test.fa" -c "../codon.txt"
+Analysis program [ ../anno ] started on Tue Jan 29 21:30:48 2013
+# ParameterList created by zhanxw on dumbo at Tue Jan 29 21:30:48 2013
+-i "input.test.plain.txt" -o "correct.test.plain.txt" -g "test.gene.txt" -r "test.fa" --inputFormat "plain" -c "../codon.txt"
+Version: 9db7c785a926bfe700087ed18288cb9c8f14717a
 Reference genome file test.fa loads succeed!
 Codon file ../codon.txt loads succeed!
 Priority file /net/fantasia/home/zhanxw/anno/priority.txt load succeed!
+Input gene format: refFlat
 Gene file test.gene.txt loads succeed!
-Annotate input.test.plain.txt to correct.test.plain.txt succeed!
 Generate frequency of each annotation type in correct.test.plain.txt.anno.frq succeed!
 Generate frequency of high priority for highest priority annotation type in correct.test.plain.txt.top.anno.frq succeed!
 Generate frequency of each base change in correct.test.plain.txt.base.frq succeed!
 Generate frequency of each codon change in correct.test.plain.txt.codon.frq succeed!
 Generate frequency of indel length in correct.test.plain.txt.indel.frq succeed!
-Analysis succeeded in 0 second(s) and finished at Mon Aug 13 13:37:35 2012
+Annotate input.test.plain.txt to correct.test.plain.txt succeed!
+Analysis succeeded in 0 second(s) and finished at Tue Jan 29 21:30:48 2013

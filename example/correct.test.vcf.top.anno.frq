@@ -3,11 +3,10 @@ Stop_Loss	1
 Frameshift	1
 CodonGain	1
 Insertion	1
-Deletion	1
 Synonymous	1
 Essential_Splice_Site	1
 Utr5	1
 Upstream	1
-Intergenic	1
+Intergenic	2
 Nonsynonymous	3
 Normal_Splice_Site	3

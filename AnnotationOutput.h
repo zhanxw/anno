@@ -25,10 +25,17 @@ class AnnotationOutput{
     this->priority = &p;
   };
   void buildKeywordDict() {
-    // const AnnotationResultCollection& r = *this->annotationResult;
-    if (this->annotationResult->size() == 0) { // intergenic
-      // will handle later in each separate functions.
+    if (this->annotationResult->empty()) {
+      // something should not be happen, at least one type of anntation should be here.
+      fprintf(stderr, "Internal logic error: no annotation found. \n");
       return;
+    }
+    if (this->annotationResult->size() == 1) { // intergenic or monomorhpic
+      if ((*this->annotationResult)[0].getType()[0] == MONOMORPHIC ||
+          (*this->annotationResult)[0].getType()[0] == INTERGENIC) {
+        // will handle later in each separate functions.
+        return;
+      }
     };
     const std::vector<AnnotationResult>& top = this->annotationResult->getTopAnnotation();
     const std::vector<AnnotationResult>& all = this->annotationResult->getAllAnnotation();
@@ -54,9 +61,15 @@ class AnnotationOutput{
   // Format:
   //  Most_priority:gene1|gene2
   std::string getTopPriorityAnnotation() const{
-    if (this->annotationResult->empty()) {
-      return AnnotationString[INTERGENIC];
-    };
+    if (this->annotationResult->size() == 1) { // intergenic or monomorhpic
+      if ((*this->annotationResult)[0].getType()[0] == MONOMORPHIC) {
+        return AnnotationString[MONOMORPHIC];
+      }
+      if ((*this->annotationResult)[0].getType()[0] == INTERGENIC) {
+        return AnnotationString[INTERGENIC];
+      }
+    }
+        
     std::string s;
     if (this->topPriorityTemplate.translate(&s)) {
       fprintf(stderr, "topPriorityTemplate failed translation!\n");
@@ -65,9 +78,15 @@ class AnnotationOutput{
   };
 
   std::string getFullAnnotation() const{
-    if (this->annotationResult->empty()) {
-      return AnnotationString[INTERGENIC];
-    };
+    if (this->annotationResult->size() == 1) { // intergenic or monomorhpic
+      if ((*this->annotationResult)[0].getType()[0] == MONOMORPHIC) {
+        return AnnotationString[MONOMORPHIC];
+      }
+      if ((*this->annotationResult)[0].getType()[0] == INTERGENIC) {
+        return AnnotationString[INTERGENIC];
+      }
+    }
+    
     std::string s;
     if (this->fullTemplate.translate(&s)) {
       fprintf(stderr, "fullTemplate failed translation!\n");

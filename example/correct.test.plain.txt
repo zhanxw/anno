@@ -11,7 +11,7 @@
 1	2000	C	A	Intergenic	Intergenic
 1	14	A	AGCG	CodonGain:GENE1|GENE3	GENE1/CODING_GENE:+:CodonGain(Ala):Insertion:Normal_Splice_Site:Exon|GENE3/CODING_GENE:-:CodonGain(Arg):Insertion:Normal_Splice_Site:Exon|GENE2/NON_CODING_GENE:+:Insertion:Upstream
 1	22	G	GC	Insertion:GENE1|GENE2|GENE3	GENE1/CODING_GENE:+:Insertion:Essential_Splice_Site:Intron|GENE3/CODING_GENE:-:Insertion:Essential_Splice_Site:Intron|GENE2/NON_CODING_GENE:+:Insertion:Normal_Splice_Site:Exon:Noncoding
-1	7	TAA	.	Deletion:GENE1|GENE2|GENE3	GENE1/CODING_GENE:+:Deletion:Essential_Splice_Site:Normal_Splice_Site:Intron|GENE3/CODING_GENE:-:Deletion:Essential_Splice_Site:Normal_Splice_Site:Intron|GENE2/NON_CODING_GENE:+:Deletion:Upstream
+1	7	TAA	.	Monomorphic	Monomorphic
 1	20	AAGTA	A	Frameshift:GENE1|GENE3	GENE1/CODING_GENE:+:Frameshift:Deletion:Essential_Splice_Site:Normal_Splice_Site:Exon:Intron|GENE3/CODING_GENE:-:Frameshift:Deletion:Essential_Splice_Site:Normal_Splice_Site:Exon:Intron|GENE2/NON_CODING_GENE:+:Deletion:Normal_Splice_Site:Exon:Noncoding
 1	53	C	A,T	Nonsynonymous:GENE1	GENE1/CODING_GENE:+:Nonsynonymous(CCC/Pro/P->ACC/Thr/T:Base20/30:Codon7/10:Exon5/5):Normal_Splice_Site:Exon|GENE3/CODING_GENE:-:Synonymous(GGG/Gly/G->GGT/Gly/G:Base13/30:Codon5/10:Exon1/5):Normal_Splice_Site:Exon|GENE2/NON_CODING_GENE:+:Downstream
 1	53	C	A[	StructuralVariation:GENE1|GENE2|GENE3	GENE1/CODING_GENE:+:StructuralVariation:CodonRegion:Normal_Splice_Site:Exon|GENE3/CODING_GENE:-:StructuralVariation:CodonRegion:Normal_Splice_Site:Exon|GENE2/NON_CODING_GENE:+:StructuralVariation:Downstream

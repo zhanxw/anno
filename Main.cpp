@@ -380,7 +380,7 @@ int main(int argc, char *argv[])
     if (aof.indexOutput() == 0) {
       fprintf(stderr, "DONE: Indexing succeed!\n");
     } else {
-      fprintf(stderr, "WARNING: Indexing failed!\n");
+      fprintf(stderr, "ERROR: Indexing failed!\n");
     }
   };
 

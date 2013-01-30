@@ -152,28 +152,40 @@ private:
     // check VARATION_TYPE
     std::string alt = altParam;
     VARIATION_TYPE type = determineVariationType(ref, alt);
+    AnnotationResult annotationPerGene;
+    this->annotationResults.clear();
+    
     if (type == MIXED) {
       // only annotate the first variation
       int commaPos = alt.find(',');
       alt = altParam.substr(0, commaPos);
       type = determineVariationType(ref, alt);
     }
-    // find near target genes
-    std::vector<unsigned> potentialGeneIdx;
-    this->findInRangeGene(chrom, pos, &potentialGeneIdx);
-    // if Intergenic,  we will have (potentialGeneIdx.size() == 0)
-
-    this->annotationResults.clear();
-    AnnotationResult annotationPerGene;
-    // annotate for each gene
-    for (unsigned int i = 0; i < potentialGeneIdx.size(); i++) {
-      annotationPerGene.clear();
-      this->annotateByGene(potentialGeneIdx[i], chrom, pos, ref, alt, type, &annotationPerGene);
-      // annotationPerGene.dump();
+    
+    if (type == NO_VARIATION) {
+      annotationPerGene.add(MONOMORPHIC);
       this->annotationResults.push_back(annotationPerGene);
+    } else {
+      // find near target genes
+      std::vector<unsigned> potentialGeneIdx;
+      this->findInRangeGene(chrom, pos, &potentialGeneIdx);
+      // if Intergenic,  we will have (potentialGeneIdx.size() == 0)
+
+
+      // annotate for each gene
+      size_t i;
+      for ( i = 0; i < potentialGeneIdx.size(); i++) {
+        annotationPerGene.clear();
+        this->annotateByGene(potentialGeneIdx[i], chrom, pos, ref, alt, type, &annotationPerGene);
+        // annotationPerGene.dump();
+        this->annotationResults.push_back(annotationPerGene);
+      }
+      if ( i == 0 ) {
+        annotationPerGene.add(INTERGENIC);
+        this->annotationResults.push_back(annotationPerGene);
+      }
     }
     annotationResults.sortByPriority(this->priority);
-    
     // record frquency info
     updateTypeFrequency(type, ref, alt);
     updateAnnotationFrequency(annotationResults);
@@ -193,10 +205,20 @@ public:
     }
   }
   void updateAnnotationFrequency(const AnnotationResultCollection& result) {
-    if (!result.size()) { // intergenic
-      this->annotationTypeFreq.add(INTERGENIC);
-      this->topPriorityAnnotationTypeFreq.add(INTERGENIC);
-    } else {
+    assert( !result.empty());
+    if (result.size() == 1 ) {
+      if (result.getTopAnnotation()[0].getType()[0] == INTERGENIC) {
+        this->annotationTypeFreq.add(INTERGENIC);
+        this->topPriorityAnnotationTypeFreq.add(INTERGENIC);
+        return;
+      }
+      if (result.getTopAnnotation()[0].getType()[0] == MONOMORPHIC) {
+        this->annotationTypeFreq.add(INTERGENIC);
+        this->topPriorityAnnotationTypeFreq.add(INTERGENIC);
+        return;
+      }
+    }
+    
       const std::vector<AnnotationResult>& top = result.getTopAnnotation();
       this->topPriorityAnnotationTypeFreq.add(top[0].getType()[0]);
       
@@ -207,7 +229,7 @@ public:
           this->annotationTypeFreq.add( all[i].getType() [j] );
         }
       }
-    }
+
   };
   void setAnnotationParameter(GeneAnnotationParam& param) {
     this->param = param;
@@ -739,6 +761,9 @@ public:
    * @return the variation type depending on the first entry in the alt field
    */
   VARIATION_TYPE determineVariationType(const std::string& ref, const std::string& alt) {
+    if (alt == ".") {
+      return NO_VARIATION;
+    }
     if (alt.find(',') != std::string::npos) {
       return MIXED;
     }

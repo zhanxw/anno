@@ -8,6 +8,7 @@ typedef enum {
   DEL,
   MIXED,
   SV,
+  NO_VARIATION, // monomorphic site
   UNKNOWN = 99
 } VARIATION_TYPE;
 
@@ -35,7 +36,8 @@ typedef enum {
   DOWNSTREAM,
   SNV,                    /*SNV contains the following 6 types, it appears when there is no reference.*/
   NONCODING,
-  INTERGENIC
+  INTERGENIC,
+  MONOMORPHIC
 } AnnotationType;
 
 

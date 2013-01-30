@@ -8,6 +8,9 @@
  */
 class AnnotationResult{
  public:
+  AnnotationResult() {
+    this->clear();
+  }
   void clear() {
     this->gene = NULL;
     this->type.clear();
