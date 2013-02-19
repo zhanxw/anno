@@ -455,7 +455,7 @@ public:
       Format illustration:
       Individual Filter : --indvDepthMin [], --indvDepthMax [], --indvQualMin []
       <- group name widt -><- SEP -><----------- flag name width ------------------------->
-          GROUP_WIDTH                               FLAG_WIDTH
+      GROUP_WIDTH                               FLAG_WIDTH
     */
 
     LineBreaker leftColumn(FLAG_WIDTH);
@@ -464,7 +464,7 @@ public:
     std::string left;
     std::string right;
     std::string rightItem;
-    
+
     for (size_t groupIndex = 0; groupIndex < this->groupNameFlagIndexMap.size(); ++groupIndex){
       std::string k;
       std::vector<unsigned int> v;
@@ -527,7 +527,7 @@ public:
       } // end loop per param group
       // fprintf(stderr, "\n");
       leftColumn.setContent(left);
-      rightColumn.setContent(right);      
+      rightColumn.setContent(right);
       printTwoColumn(stderr, leftColumn, rightColumn, "");
     }
   };
@@ -576,7 +576,7 @@ private:
   // those not processed argument
   std::vector<std::string>* ptrRemainingArg;
   const static int FLAG_WIDTH = 25;
-  const static int DOC_WIDTH = 55; 
+  const static int DOC_WIDTH = 55;
 };
 
 #define BEGIN_PARAMETER_LIST(pp)                \
@@ -599,5 +599,15 @@ private:
 #define ADD_STRING_PARAMETER(pp, x, flag, doc)          \
   std::string FLAG_##x;                                 \
   (pp).AddParameter(STRING_TYPE, &FLAG_##x, flag, doc);
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Helper functions
+static void REQUIRE_STRING_PARAMETER(const std::string& flag, const char* msg){
+  if (flag.size() == 0){
+    fprintf(stderr, "%s\n", msg);
+    abort();
+  }
+};
 
 #endif /* _ARGUMENT_H_ */

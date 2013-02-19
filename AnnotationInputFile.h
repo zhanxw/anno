@@ -204,13 +204,14 @@ class AnnotationInputFile{
 
     // verify reference
     if (this->checkReference) {
-      std::string refFromGenome = this->gs.getBase(*chrom, *pos, *pos + ref->size());
+      // getBase() use 0-based index
+      std::string refFromGenome = this->gs.getBase(*chrom, *pos - 1, *pos + ref->size() - 1);
       if ((*ref) != refFromGenome) {
         ++ failedReferenceSite;
         if (failedReferenceSite <= 10) { // output at most 10 warnings
-          fprintf(stderr, "ERROR: Reference allele does not match genome reference [ %s:%d %s]\n", chrom->c_str(), *pos, ref->c_str());
+          fprintf(stderr, "ERROR: Reference allele [ %s ] does not match reference genome [ %s ] at [ %s:%d ]\n", ref->c_str(), refFromGenome.c_str(), chrom->c_str(), *pos);
         }
-        LOG << "ERRROR: Reference allele [" << ref <<   "]  does not match reference genome [" << refFromGenome << "] at " << *chrom << ":" << *pos << "\n";
+        LOG << "ERRROR: Reference allele [" << (*ref) <<   "]  does not match reference genome [" << refFromGenome << "] at " << *chrom << ":" << *pos << "\n";
       };
     }
     return true;
