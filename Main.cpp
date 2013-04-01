@@ -36,12 +36,12 @@
 void banner(FILE* fp) {
   const char* string =
       "..............................................         \n"
-      " ...      Anno(tation)                       ...       \n"
+      " ...      TabAnno(tation)                    ...       \n"
       "  ...      Xiaowei Zhan, Goncalo Abecasis     ...      \n"
       "   ...      Speical Thanks:                    ...     \n"
       "    ...      Hyun Ming Kang, Yanming Li         ...    \n"
       "     ...      zhanxw@umich.edu                    ...  \n"
-      "      ...      Sep 2011                            ... \n"
+      "      ...      Feb 2013                            ... \n"
       "       ................................................\n"
       "                                                       \n"
       ;
