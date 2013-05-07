@@ -21,8 +21,8 @@ Contents
 
 [Contact](#Contact)
 
-!https://api.travis-ci.org/zhanxw/anno.png
-[![Build Status](https://api.travis-ci.org/zhanxw/anno.png)](https://travis-ci.org/zhanxw/anno)
+
+[![Build Status](https://travis-ci.org/[YOUR_GITHUB_USERNAME]/[YOUR_PROJECT_NAME].png)](https://travis-ci.org/[YOUR_GITHUB_USERNAME]/[YOUR_PROJECT_NAME])
 
 * * * * *
 
