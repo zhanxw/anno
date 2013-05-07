@@ -22,7 +22,7 @@ Contents
 [Contact](#Contact)
 
 
-[![Build Status](https://travis-ci.org/zhanxw/anno)](https://travis-ci.org/zhanxw/anno)
+[![Build Status](https://travis-ci.org/zhanxw/anno.png?branch=master)](https://travis-ci.org/zhanxw/anno)
 
 * * * * *
 
