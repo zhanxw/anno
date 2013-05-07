@@ -22,7 +22,7 @@ Contents
 [Contact](#Contact)
 
 
-[![Build Status](https://travis-ci.org/[YOUR_GITHUB_USERNAME]/[YOUR_PROJECT_NAME].png)](https://travis-ci.org/[YOUR_GITHUB_USERNAME]/[YOUR_PROJECT_NAME])
+[![Build Status](https://travis-ci.org/zhanxw/anno)](https://travis-ci.org/zhanxw/anno)
 
 * * * * *
 
