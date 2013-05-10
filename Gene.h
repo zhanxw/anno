@@ -341,10 +341,10 @@ public:
     // we define essential splice site is (GU...AG) in the intron, and next to exon
     // and GU, AG both have length 2.
     for (unsigned int i = 0; i < exonNumber - 1; i++ ) {
-      if (this->isInRange(variantPos, this->exon[i].end+1, this->exon[i].end+1+2)) {
+      if (this->isInRange(variantPos, this->exon[i].end + 1, this->exon[i].end + 2)) {
         *isEssentialSpliceSite = true;
         return true;
-      } else if (this->isInRange(variantPos, this->exon[i+1].start - 1 - 2, this->exon[i+1].start - 1)) {
+      } else if (this->isInRange(variantPos, this->exon[i+1].start - 2, this->exon[i+1].start - 1)) {
         *isEssentialSpliceSite = true;
         return true;
       }
