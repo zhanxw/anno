@@ -92,7 +92,6 @@ class GeneAnnotation{
     // output frequency files
     std::string fn = outputFileName;
 
-
     // output annotation frequency (all types of annotation)
     std::string ofs = fn+".anno.frq";
     this->printAnnotationFrequency(ofs.c_str());
@@ -104,6 +103,9 @@ class GeneAnnotation{
     this->printTopPriorityAnnotationFrequency(ofs.c_str());
     fprintf(stderr, "DONE: Generated frequency of each highest priority annotation type in [ %s ].\n", ofs.c_str());
     LOG << "Generate frequency of high priority for highest priority annotation type in " << ofs << " succeed!\n";
+
+    // output Ts/Tv ratio
+    this->printTsTvRatio();
 
     // output base change frequency
     ofs = fn+".base.frq";
@@ -262,7 +264,7 @@ public:
   void printBaseChangeFrequency(const char* fileName){
     FILE* fp = fopen(fileName, "wt");
     assert(fp);
-    unsigned int n = this->baseFreq.size();
+    const unsigned int n = this->baseFreq.size();
     for (unsigned int i = 0; i < n; i++){
       std::string k;
       int freq;
@@ -271,10 +273,11 @@ public:
     }
     fclose(fp);
   };
+  
   void printCodonChangeFrequency(const char* fileName){
     FILE* fp = fopen(fileName, "wt");
     assert(fp);
-    unsigned int n = this->codonFreq.size();
+    const unsigned int n = this->codonFreq.size();
     for (unsigned int i = 0; i < n; i++){
       std::string k;
       int freq;
@@ -286,7 +289,7 @@ public:
   void printIndelLengthFrequency(const char* fileName){
     FILE* fp = fopen(fileName, "wt");
     assert(fp);
-    unsigned int n = this->indelLengthFreq.size();
+    const unsigned int n = this->indelLengthFreq.size();
     for (unsigned int i = 0; i < n; i++){
       int key;
       int freq;
@@ -295,6 +298,49 @@ public:
     }
     fclose(fp);
   };
+  void printTsTvRatio(){
+    const unsigned int n = this->baseFreq.size();
+    unsigned int ts = 0;
+    unsigned int tv = 0;
+    for (unsigned int i = 0; i < n; i++){
+      std::string k;
+      int freq;
+      this->baseFreq.at(i, &k, &freq);
+
+      // summarize ts/tv
+      if (k.size() == 4 ||  // only process A->T type of mutation
+          k[1] == '-' ||
+          k[2] == '>') {
+        char c1 = k[0];
+        char c2 = k[3];
+        // flip G to A and T to C
+        // then compare if flipped alleles are the same.
+        if (c1 == 'G') c1 = 'A';
+        if (c1 == 'T') c1 = 'C';
+        if (c2 == 'G') c2 = 'A';
+        if (c2 == 'T') c2 = 'C';
+        if (c1 != 'A' && c1 != 'C') continue;
+        if (c2 != 'A' && c2 != 'C') continue;
+        if (c1 == c2) {
+          ++ts;
+        } else {
+          ++tv;
+        }
+      }
+    }
+    // output ts/tv statistics
+    if (tv != 0) {
+      double tstv = 1.0 * ts / tv;
+      LOG << "Ts/Tv ratio: " << tstv << "\n";
+      fprintf(stderr, "Ts/Tv ratio: %g\n", tstv);
+    } else {
+      LOG << "Ts/Tv ratio: NA\n";
+      fprintf(stderr, "Ts/Tv ratio: NA\n");
+    }
+    LOG << "Ts observed: " << ts << " times; Tv observed: " << tv << " times.\n";
+    fprintf(stderr, "Ts observed: %d  times; Tv observed: %d times.\n", ts, tv);
+  };
+  
  private:
   // make sure genes are ordered
   void sortGene() {
