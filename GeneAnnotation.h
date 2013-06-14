@@ -322,9 +322,9 @@ public:
         if (c1 != 'A' && c1 != 'C') continue;
         if (c2 != 'A' && c2 != 'C') continue;
         if (c1 == c2) {
-          ++ts;
+          ts += freq;
         } else {
-          ++tv;
+          tv += freq;
         }
       }
     }
