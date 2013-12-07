@@ -24,20 +24,20 @@ Contents
 Introduction
 ============
 
-Anno is short for "annotation", it is used for annotate variants. Our
-goal is to provide abundant information for genetic variants promptly.
-Some annotation software output only one type of annotation, while Anno
-will provide annotations to all transcripts of a gene. Anno support
-various file format: VCF file, plain file, plink association output file
+TabAnno is short for "Tab-delimited file Annotation", it is used for annotate variety of genetic variants stored in tab-delimited files. 
+Our goal is to provide abundant information for genetic variants efficiently.
+Some annotation software output only one annotation per variant, while TabAnno
+will provide annotations to all transcripts. TabAnno supports
+various file format: VCF file, plain text file, plink association output file
 and
-[epacts](http://genome.sph.umich.edu/wiki/EPACTS "http://genome.sph.umich.edu/wiki/EPACTS")
+[EPACTS](http://genome.sph.umich.edu/wiki/EPACTS "http://genome.sph.umich.edu/wiki/EPACTS")
 file.
 
 Quick tutorial
 ==============
 
 You have an input file in VCF format, and your goal is to annotate it
-using refFlat genes database. Then you just need the following command:
+using refFlat gene definition. Then you just need the following command:
 
      anno -i input.vcf -o output.vcf -r hs37d5.fa -g refFlat_hg19.txt.gz -p priority.txt -c codon.txt
 
@@ -48,7 +48,7 @@ Required files:
     [hs37d5.fai](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/hs37d5.fa.fai "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/hs37d5.fa.fai")
     )
 
--   [refFlag\_hg19.txt.gz](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz")
+-   [refFlag\_hg19.txt.gz](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz"http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz")
     Gene database in refFlat format (from UCSC website). You can also
     use [Gencode version
     7](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat.gencode.v7.gz "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat.gencode.v7.gz")
@@ -61,6 +61,9 @@ Required files:
 -   [priority.txt](http://www.sph.umich.edu/csg/zhanxw/software/anno/priority.txt "http://www.sph.umich.edu/csg/zhanxw/software/anno/priority.txt")
     Priority file, which determines wich annotation type is more
     important
+
+NOTE: a script, 'resources/download.sh,  can conveniently download all above files.
+
 
 Outputs:
 
@@ -92,7 +95,7 @@ as an example:
 
 Console information:
 
-When anno finished annotation successfully, you will see it output
+When TabAnno finished annotation successfully, you will see it output
 necessary information as below. You will find basic summary of reference
 genome, ts/tv ratio, total number of variants and so on.
 
@@ -134,12 +137,12 @@ Where to Find It
 
 Anno code is hosted online
 [anno](https://github.com/zhanxw/anno "https://github.com/zhanxw/anno").
-You can download the source and compile (type 'make release').
+You can download the source, unpack the tar file and compile (type 'make').
 
 For CSG internal users, the compiled executable file is at:
 /net/fantasia/home/zhanxw/anno/executable/anno
 
-The source code is located at:/net/fantasia/home/zhanxw/anno You can
+The source code is located at: /net/fantasia/home/zhanxw/anno . You can
 type 'make release' to compile your own executable file. Type "make
 test1" or "make test2" will demonstrate the command line to annotate
 example VCF files.
@@ -150,12 +153,11 @@ Usage
 Command line
 ------------
 
-After you obtain the anno executable (either by compiling the source
+After you obtain the TabAnno executable (either by compiling the source
 code or by downloading the pre-compiled binary file), you will find the
 executable file under executable/anno.
 
-Here is the anno help page by invoking anno without any command line
-arguments:
+Here is the help page by invoking TabAnno under command line with no parameters:
 
      some_linux_host > executable/anno
     ..............................................       
@@ -171,8 +173,8 @@ arguments:
     Gene Annotation Parameters
                            -g : Specify gene file
                            -r : Specify reference genome position
-                --inputFormat : Specify format (default: vcf). "-f plain " will use fir
-                                st 4 columns as chrom, pos, ref, alt
+                --inputFormat : Specify format (default: vcf). "--inputFormat plain" will 
+                                use first 4 columns as chrom, pos, ref, alt
              --checkReference : Check whether reference alleles matches genome reference
                            -f : Specify gene file format (default: refFlat, other optio
                                 ns: knownGene, refGene)
@@ -214,7 +216,7 @@ self explanatory.
 
     -r Specify a FASTA format reference genome file.
 
-Specify *-r* option enable anno to give more detailed information, for
+Specifying *-r* option enable TabAnno to give more detailed information, for
 example, instead of annotating a variant as exon, it will tell you which
 codon, which exon that variant locates, whether its
 synonymous/non-synonymous and etc.
@@ -228,16 +230,16 @@ For example, you can specify Fasta file of the whole genome and use "-r
 
 -   Gene file format
 
-Currently, anno support gene file in refFlat format. A prepared list of
+Currently, TabAnno supports gene file in refFlat format. A prepared list of
 all gene obtained of UCSC website is:
 "/net/fantasia/home/zhanxw/anno/refFlat\_hg19.txt.gz" . To use that
 file, you use flag *-g*.
 
-As anno support refFlat file by default, you can use refFlat format
+As TabAnno supports refFlat file by default, you can use refFlat format
 without specify gene format flag *-f*.
 
 To use knownGene or refGene format, you need to specify both *-g* and
-*-f* flat to tell anno which gene file and which format it is. For
+*-f* flat to tell TabAnno which gene file and which format it is. For
 example, *-g /net/fantasia/home/zhanxw/anno/knownGene.txt.gz -f
 knownGene*.
 
@@ -246,7 +248,7 @@ knownGene*.
 Codon file can tell the relationship between triplet codons and amino
 acids. A default file is located in:
 */net/fantasia/home/zhanxw/anno/codon.txt*. If you have special codon
-file, you can specify that using flag *-c*, otherwise, anno will use the
+file, you can specify that using flag *-c*, otherwise, TabAnno will use the
 default codon file:
 
 *default codon file*
@@ -343,7 +345,7 @@ Built-in example
 ----------------
 
 In example/ folder, you can see test.vcf, which is a toy example. You
-can invoke anno using the following command line:
+can invoke TabAnno using the following command line:
 
     cd example; ./anno -i test.vcf -r test.fa -g test.gene.txt -c ../codon.txt -o test.out.vcf
 
