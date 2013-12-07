@@ -3,7 +3,7 @@ DEFAULT_CXXFLAGS = -D__STDC_LIMIT_MACROS
 
 
 .PHONY: release debug
-all: debug
+all: release
 
 LIB = third/tabix/libtabix.a
 third/tabix/libtabix.a:
@@ -18,7 +18,7 @@ debug: $(EXEC)
 profile: CXXFLAGS = -ggdb -pg -O0 $(DEFAULT_CXXFLAGS)
 profile: $(EXEC)
 
-GitVersion.h: .git/HEAD .git/index
+GitVersion.h: $(wildcard .git/HEAD) $(wildcard .git/index)
 	echo "const char *gitVersion = \"$(shell git rev-parse HEAD)\";" > $@
 
 TabixReader.h: $(LIB)

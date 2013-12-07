@@ -157,7 +157,8 @@ class AnnotationInputFile{
         break;
       case PLINK:
         stringNaturalTokenize(line, "\t ", &fd);
-        if (fd.size() < 10) return false;
+        // will access fd[6], so at least 7 elements here
+        if (fd.size() <= 7) return false;
         *chrom = fd[0];
         *pos = toInt(fd[2]);
         *ref = fd[3];
