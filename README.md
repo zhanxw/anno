@@ -436,3 +436,7 @@ annotation software
 [vcfCodingSnps](http://www.sph.umich.edu/csg/liyanmin/vcfCodingSnps/Tutorial.shtml "http://www.sph.umich.edu/csg/liyanmin/vcfCodingSnps/Tutorial.shtml"),
 and Hyun Ming Kang for his code related to genome scores and his
 consistent suggestions and feedbacks.
+
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/zhanxw/anno/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
