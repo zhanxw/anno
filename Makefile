@@ -5,11 +5,23 @@ DEFAULT_CXXFLAGS = -D__STDC_LIMIT_MACROS
 .PHONY: release debug
 all: release
 
+##################################################
+## Library
 LIB = third/tabix/libtabix.a
 third/tabix/libtabix.a:
 	(cd third; make tabix)
 
-release: CXXFLAGS = -O2 -DNDEBUG $(DEFAULT_CXXFLAGS)
+##################################################
+## Platform dependent variables 
+ARCH := $(firstword $(shell uname -m))
+SYS := $(firstword $(shell uname -s))
+ifeq ($(SYS), Linux)
+  STATIC_FLAG = -static                                                  
+endif
+
+##################################################
+## Main 
+release: CXXFLAGS = -O2 -DNDEBUG $(DEFAULT_CXXFLAGS) $(STATIC_FLAG)
 release: $(EXEC)
 	-mkdir -p executable
 	cp -f $(EXEC) executable
