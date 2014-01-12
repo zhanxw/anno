@@ -48,7 +48,7 @@ Required files:
     [hs37d5.fai](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/hs37d5.fa.fai "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/hs37d5.fa.fai")
     )
 
--   [refFlag\_hg19.txt.gz](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz"http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz")
+-   [refFlat\_hg19.txt.gz](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz"http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz")
     Gene database in refFlat format (from UCSC website). You can also
     use [Gencode version
     7](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat.gencode.v7.gz "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat.gencode.v7.gz")
