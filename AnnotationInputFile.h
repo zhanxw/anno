@@ -136,8 +136,6 @@ class AnnotationInputFile{
       } while (this->line.empty());
     }
 
-
-
     switch (this->format){
       case VCF:
         stringTokenize(line, "\t ", &fd);
