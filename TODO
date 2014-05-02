@@ -3,12 +3,14 @@ TODO
 7. output site files for different category of annotation.
    e.g. LOF file, NonSyn file...
 8. Support different terms: e.g missense, non-sense ... instead of synonymous, nonsynonymous
+9. Support custom input file formats
+10. Support ANNOVAR type annotation
 
 MIGHT-DO
 ========
 1. vcfVersion checker 
 2. joining sift and polyphen-2.
-3. output format are configurable (user specify).
+3. output format are configurable (user specify) - will add ANNOVAR support.
 5. customized output
 
 DONE

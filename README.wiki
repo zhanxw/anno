@@ -40,6 +40,43 @@ The format can be explained by sections, and we use annotation for GENE1 as an e
 * Codon1/10 : mutation happens on the 1st codon of the total 10 codons
 * Exon1/5 : mutation happens on the 1st exon of the total 5 exons
 
+Console information:
+
+When anno finished annotation successfully, you will see it output necessary information as below.
+You will find basic summary of reference genome, ts/tv ratio, total number of variants and so on.
+
+  The following parameters are available.  Ones with "[]" are in effect:
+  
+  Available Options
+      Required Parameters : -i [input.vcf], -o [output.vcf]
+         Gene Annotations :
+                            -g [/net/fantasia/home/zhanxw/anno/resources/refFlat_hg19.txt.gz]
+                            -r [/net/fantasia/home/zhanxw/anno/resources/hs37d5.fa]
+                            --inputFormat [], --checkReference, -f [], -p []
+                            -c [], -u [], -d [], --se [], --si []
+        Other Annotations : --genomeScore [], --bed [], --tabix []
+      Auxillary Functions : --outputFormat [], --indexOutput
+  Use default priority file: /net/fantasia/home/zhanxw/anno/priority.txt
+  Use default codon file: /net/fantasia/home/zhanxw/anno/codon.txt
+  Load reference genome /net/fantasia/home/zhanxw/anno/resources/hs37d5.fa...
+  DONE: 86 chromosomes and 3137454505 bases are loaded.
+  Load codon file /net/fantasia/home/zhanxw/anno/codon.txt...
+  DONE: codon file loaded.
+  Load priority file /net/fantasia/home/zhanxw/anno/priority.txt...
+  DONE: 25 priority annotation types loaded.
+  Load gene file /net/fantasia/home/zhanxw/anno/resources/refFlat_hg19.txt.gz...
+  DONE: 39173 gene loaded.
+  DONE: Generated frequency of each annotype type in [ output.vcf.anno.frq ].
+  DONE: Generated frequency of each highest priority annotation type in [ output.vcf.top.anno.frq ].
+  Ts/Tv ratio: 0.666667
+  Ts observed: 4  times; Tv observed: 6 times.
+  DONE: Generated frequency of each base change in [ output.vcf.base.frq ].
+  DONE: Generated frequency of each codon change in [ output.vcf.codon.frq ].
+  DONE: Generated frequency of indel length in [ output.vcf.indel.frq ].
+  DONE: 59 varaints are annotated.
+  DONE: Generated annotation output in [ output.vcf ].
+  Annotation succeed!
+  
 = Where to Find It =
 
 TabAnno code is hosted online [https://github.com/zhanxw/anno anno]. You can download the source and compile (type 'make release').

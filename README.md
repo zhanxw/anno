@@ -17,37 +17,27 @@ Contents
 
 -   [Built-in example](#Built-in_example)
 
-[Resources](#Resources)
-
 [Contact](#Contact)
-
-!https://api.travis-ci.org/zhanxw/anno.png
-[![Build Status](https://api.travis-ci.org/zhanxw/anno.png)](https://travis-ci.org/zhanxw/anno)
 
 * * * * *
 
 Introduction
 ============
 
-TabAnno is short for "Tab-delimited Annotation", it is used for annotate variants. Our
-goal is to provide abundant information for genetic variants promptly.
-For example, annotations to all transcripts of a gene will be provided
-instead of just listing one single annotation. TabAnno support various file
-format: VCF file, plain file, plink association output file and
-[epacts](http://genome.sph.umich.edu/wiki/EPACTS "http://genome.sph.umich.edu/wiki/EPACTS")
+TabAnno is short for "Tab-delimited file Annotation", it is used for annotate variety of genetic variants stored in tab-delimited files. 
+Our goal is to provide abundant information for genetic variants efficiently.
+Some annotation software output only one annotation per variant, while TabAnno
+will provide annotations to all transcripts. TabAnno supports
+various file format: VCF file, plain text file, plink association output file
+and
+[EPACTS](http://genome.sph.umich.edu/wiki/EPACTS "http://genome.sph.umich.edu/wiki/EPACTS")
 file.
-
-TabAnno is a key component of [TASER]. The other component is SeqMiner, which helped to 
-extract information, such as genotype, in R. [TASER] demonstrated how to annotate next-generation sequencing (NGS) data using TabAnno 
-and statistically analyze the data using R.
-
-[TASER](http://www.zhanxw.com/taser)
 
 Quick tutorial
 ==============
 
 You have an input file in VCF format, and your goal is to annotate it
-using refFlat genes database. Then you just need the following command:
+using refFlat gene definition. Then you just need the following command:
 
      anno -i input.vcf -o output.vcf -r hs37d5.fa -g refFlat_hg19.txt.gz -p priority.txt -c codon.txt
 
@@ -58,7 +48,7 @@ Required files:
     [hs37d5.fai](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/hs37d5.fa.fai "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/hs37d5.fa.fai")
     )
 
--   [refFlag\_hg19.txt.gz](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz")
+-   [refFlat\_hg19.txt.gz](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz"http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz")
     Gene database in refFlat format (from UCSC website). You can also
     use [Gencode version
     7](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat.gencode.v7.gz "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat.gencode.v7.gz")
@@ -71,6 +61,9 @@ Required files:
 -   [priority.txt](http://www.sph.umich.edu/csg/zhanxw/software/anno/priority.txt "http://www.sph.umich.edu/csg/zhanxw/software/anno/priority.txt")
     Priority file, which determines wich annotation type is more
     important
+
+NOTE: a script, 'resources/download.sh,  can conveniently download all above files.
+
 
 Outputs:
 
@@ -100,17 +93,56 @@ as an example:
 -   Codon1/10 : mutation happens on the 1st codon of the total 10 codons
 -   Exon1/5 : mutation happens on the 1st exon of the total 5 exons
 
+Console information:
+
+When TabAnno finished annotation successfully, you will see it output
+necessary information as below. You will find basic summary of reference
+genome, ts/tv ratio, total number of variants and so on.
+
+     The following parameters are available.  Ones with "[]" are in effect:
+      
+     Available Options
+         Required Parameters : -i [input.vcf], -o [output.vcf]
+            Gene Annotations :
+                               -g [/net/fantasia/home/zhanxw/anno/resources/refFlat_hg19.txt.gz]
+                               -r [/net/fantasia/home/zhanxw/anno/resources/hs37d5.fa]
+                               --inputFormat [], --checkReference, -f [], -p []
+                               -c [], -u [], -d [], --se [], --si []
+           Other Annotations : --genomeScore [], --bed [], --tabix []
+         Auxillary Functions : --outputFormat [], --indexOutput
+     Use default priority file: /net/fantasia/home/zhanxw/anno/priority.txt
+     Use default codon file: /net/fantasia/home/zhanxw/anno/codon.txt
+     Load reference genome /net/fantasia/home/zhanxw/anno/resources/hs37d5.fa...
+     DONE: 86 chromosomes and 3137454505 bases are loaded.
+     Load codon file /net/fantasia/home/zhanxw/anno/codon.txt...
+     DONE: codon file loaded.
+     Load priority file /net/fantasia/home/zhanxw/anno/priority.txt...
+     DONE: 25 priority annotation types loaded.
+     Load gene file /net/fantasia/home/zhanxw/anno/resources/refFlat_hg19.txt.gz...
+     DONE: 39173 gene loaded.
+     DONE: Generated frequency of each annotype type in [ output.vcf.anno.frq ].
+     DONE: Generated frequency of each highest priority annotation type in [ output.vcf.top.anno.frq ].
+     Ts/Tv ratio: 0.666667
+     Ts observed: 4  times; Tv observed: 6 times.
+     DONE: Generated frequency of each base change in [ output.vcf.base.frq ].
+     DONE: Generated frequency of each codon change in [ output.vcf.codon.frq ].
+     DONE: Generated frequency of indel length in [ output.vcf.indel.frq ].
+     DONE: 59 varaints are annotated.
+     DONE: Generated annotation output in [ output.vcf ].
+     Annotation succeed!
+      
+
 Where to Find It
 ================
 
-TabAnno code is hosted online
+Anno code is hosted online
 [anno](https://github.com/zhanxw/anno "https://github.com/zhanxw/anno").
-You can download the source and compile (type 'make release').
+You can download the source, unpack the tar file and compile (type 'make').
 
 For CSG internal users, the compiled executable file is at:
 /net/fantasia/home/zhanxw/anno/executable/anno
 
-The source code is located at:/net/fantasia/home/zhanxw/anno You can
+The source code is located at: /net/fantasia/home/zhanxw/anno . You can
 type 'make release' to compile your own executable file. Type "make
 test1" or "make test2" will demonstrate the command line to annotate
 example VCF files.
@@ -121,12 +153,11 @@ Usage
 Command line
 ------------
 
-After you obtain the anno executable (either by compiling the source
+After you obtain the TabAnno executable (either by compiling the source
 code or by downloading the pre-compiled binary file), you will find the
 executable file under executable/anno.
 
-Here is the TabAnno help page by invoking `anno` without any command line
-arguments:
+Here is the help page by invoking TabAnno under command line with no parameters:
 
      some_linux_host > executable/anno
     ..............................................       
@@ -142,8 +173,8 @@ arguments:
     Gene Annotation Parameters
                            -g : Specify gene file
                            -r : Specify reference genome position
-                --inputFormat : Specify format (default: vcf). "-f plain " will use fir
-                                st 4 columns as chrom, pos, ref, alt
+                --inputFormat : Specify format (default: vcf). "--inputFormat plain" will 
+                                use first 4 columns as chrom, pos, ref, alt
              --checkReference : Check whether reference alleles matches genome reference
                            -f : Specify gene file format (default: refFlat, other optio
                                 ns: knownGene, refGene)
@@ -166,7 +197,7 @@ arguments:
 Input files
 -----------
 
-TabAnno runs on the input VCF file specified on the command-line using flag
+anno runs on the input VCF file specified on the command-line using flag
 '-i'.
 
 Additionally, you need to specify gene file using flag '-g'. You can use
@@ -185,7 +216,7 @@ self explanatory.
 
     -r Specify a FASTA format reference genome file.
 
-Specify *-r* option enable TabAnno to give more detailed information, for
+Specifying *-r* option enable TabAnno to give more detailed information, for
 example, instead of annotating a variant as exon, it will tell you which
 codon, which exon that variant locates, whether its
 synonymous/non-synonymous and etc.
@@ -199,12 +230,12 @@ For example, you can specify Fasta file of the whole genome and use "-r
 
 -   Gene file format
 
-Currently, TabAnno support gene file in refFlat format. A prepared list of
+Currently, TabAnno supports gene file in refFlat format. A prepared list of
 all gene obtained of UCSC website is:
 "/net/fantasia/home/zhanxw/anno/refFlat\_hg19.txt.gz" . To use that
 file, you use flag *-g*.
 
-As anno support refFlat file by default, you can use refFlat format
+As TabAnno supports refFlat file by default, you can use refFlat format
 without specify gene format flag *-f*.
 
 To use knownGene or refGene format, you need to specify both *-g* and
@@ -306,7 +337,7 @@ correctly treated. A working example is as follows:
 Example
 =======
 
-TabAnno can annotate a VCF file and also output statistics of 4 frequency
+anno can annotate a VCF file and also output statistics of 4 frequency
 table: annotation type; base change; codon change; indel size. More
 details will be given below.
 
@@ -392,38 +423,6 @@ Four frequency table will be generated after annotation. For example:
     3       1
     -3      1
 
-Resources
-=========
-
--   Reference genome in NCBI build 37 
-    [hs37d5.fa](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/hs37d5.fa "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/hs37d5.fa")
-    and its index file:
-    [hs37d5.fai](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/hs37d5.fa.fai "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/hs37d5.fa.fai") 
-
--   Gene database
-    [refFlag\_hg19.txt.gz](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat_hg19.txt.gz")
-    Gene database in refFlat format (from UCSC website). You can also
-    use [Gencode version 7](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat.gencode.v7.gz "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat.gencode.v7.gz")
-    or [Gencode version
-    11](http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat.gencode.v11.gz "http://www.sph.umich.edu/csg/zhanxw/software/anno/resources/refFlat.gencode.v11.gz").
-
--   Codon file (Human codon table.)
-    [codon.txt](http://www.sph.umich.edu/csg/zhanxw/software/anno/codon.txt "http://www.sph.umich.edu/csg/zhanxw/software/anno/codon.txt") 
-    For other species with different codons, you need to modify its content.
-
--   Annotation priority
-    Default priority file: [priority.txt](http://www.sph.umich.edu/csg/zhanxw/software/anno/priority.txt "http://www.sph.umich.edu/csg/zhanxw/software/anno/priority.txt")
-    The default priority file determines wich annotation type is more important. 
-    This file affects the *ANNO* tag as it outputs the mutation with the highest priority.
-
--   GERP score
-    Binary GERP score file (courtesy of Hyun Min Kang).
-	
--   dbNSFP file
-    Processed from dbNSFP website.
-	
-	
-
 Contact
 =======
 
@@ -437,3 +436,7 @@ annotation software
 [vcfCodingSnps](http://www.sph.umich.edu/csg/liyanmin/vcfCodingSnps/Tutorial.shtml "http://www.sph.umich.edu/csg/liyanmin/vcfCodingSnps/Tutorial.shtml"),
 and Hyun Ming Kang for his code related to genome scores and his
 consistent suggestions and feedbacks.
+
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/zhanxw/anno/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
