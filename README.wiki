@@ -1,5 +1,6 @@
 = Introduction =
-Anno is short for "annotation", it is used for annotate variants. Our goal is to provide abundant information for genetic variants promptly. For example, annotations to all transcripts of a gene will be provided instead of just listing one single annotation. Anno support various file format: VCF file, plain file, plink association output file and [http://genome.sph.umich.edu/wiki/EPACTS epacts] file.
+
+TabAnno is short for "annotation", it is used for annotate variants. Our goal is to provide abundant information for genetic variants promptly. For example, annotations to all transcripts of a gene will be provided instead of just listing one single annotation. TabAnno support various file format: VCF file, plain file, plink association output file and [http://genome.sph.umich.edu/wiki/EPACTS epacts] file.
 
 = Quick tutorial =
 
@@ -41,7 +42,7 @@ The format can be explained by sections, and we use annotation for GENE1 as an e
 
 = Where to Find It =
 
-Anno code is hosted online [https://github.com/zhanxw/anno anno]. You can download the source and compile (type 'make release').
+TabAnno code is hosted online [https://github.com/zhanxw/anno anno]. You can download the source and compile (type 'make release').
 
 For CSG internal users, the compiled executable file is at: /net/fantasia/home/zhanxw/anno/executable/anno
 
@@ -93,7 +94,7 @@ Here is the anno help page by invoking anno without any command line arguments:
 
 == Input files ==
 
-anno runs on the input VCF file specified on the command-line using flag '-i'.
+TabAnno runs on the input VCF file specified on the command-line using flag '-i'.
 
 Additionally, you need to specify gene file using flag '-g'. You can use the default refFlat file (using HG19 genome build): /net/fantasia/home/zhanxw/anno/refFlat_hg19.txt.gz 
 
@@ -105,26 +106,26 @@ Some of the command line parameters are described here, but most are self explan
 
  -r Specify a FASTA format reference genome file. 
 
-Specify ''-r'' option enable anno to give more detailed information, for example, instead of annotating a variant as exon, it will tell you which codon, which exon that variant locates, whether its synonymous/non-synonymous and etc.
+Specify ''-r'' option enable TabAnno to give more detailed information, for example, instead of annotating a variant as exon, it will tell you which codon, which exon that variant locates, whether its synonymous/non-synonymous and etc.
 
-Anno requires Fasta index file and that will save running memory and speed up annotation. You can use "samtools faidx XXX.fa" to generate Fasta index file.
+TabAnno requires Fasta index file and that will save running memory and speed up annotation. You can use "samtools faidx XXX.fa" to generate Fasta index file.
 
 For example, you can specify Fasta file of the whole genome and use "-r /data/local/ref/karma.ref/human.g1k.v37.fa"
 
 *Gene file format
 
-Currently, anno support gene file in refFlat format. A prepared list of all gene obtained of UCSC website is: "/net/fantasia/home/zhanxw/anno/refFlat_hg19.txt.gz" . 
+Currently, TabAnno support gene file in refFlat format. A prepared list of all gene obtained of UCSC website is: "/net/fantasia/home/zhanxw/anno/refFlat_hg19.txt.gz" . 
 To use that file, you use flag ''-g''. 
 
-As anno support refFlat file by default, you can use refFlat format without specify gene format flag ''-f''.
+As TabAnno support refFlat file by default, you can use refFlat format without specify gene format flag ''-f''.
 
-To use knownGene or refGene format, you need to specify both ''-g'' and ''-f'' flat to tell anno which gene file and which format it is.
+To use knownGene or refGene format, you need to specify both ''-g'' and ''-f'' flat to tell TabAnno which gene file and which format it is.
 For example, ''-g /net/fantasia/home/zhanxw/anno/knownGene.txt.gz -f knownGene''.
 
 *Codon file
 
 Codon file can tell the relationship between triplet codons and amino acids. A default file is located in: ''/net/fantasia/home/zhanxw/anno/codon.txt''.
-If you have special codon file, you can specify that using flag ''-c'', otherwise, anno will use the default codon file:
+If you have special codon file, you can specify that using flag ''-c'', otherwise, TabAnno will use the default codon file:
 
 ''default codon file''
  # DNA codon table. Stop codon is coded as: Stp, O, Stop
@@ -179,7 +180,7 @@ NOTE, in bash, please use quote around parenthesis, otherwise parenthesis is not
 
 = Example =
 
-anno can annotate a VCF file and also output statistics of 4 frequency table: annotation type; base change; codon change; indel size. More details will be given below.
+TabAnno can annotate a VCF file and also output statistics of 4 frequency table: annotation type; base change; codon change; indel size. More details will be given below.
 
 == Built-in example ==
 
