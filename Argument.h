@@ -376,7 +376,7 @@ public:
         continue;
       }
 
-      // bool isLongParam = false; // I did not make use of this variable.
+      bool isLongParam = false; // I did not make use of this variable.
       unsigned int choppedLeadingDash = 0;
       // user may input ---flag, ----flag, ..., and we will chop all leading -
       // user may also input ---, ----, but I don't understand what that means, so report error
